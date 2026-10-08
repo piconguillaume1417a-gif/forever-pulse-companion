@@ -1,4 +1,15 @@
-# Installateur 0.8.0
+# Installateur
+
+**0.10.0 (8 octobre 2026)** : toute version. `Build.ps1 -Exe <exe> -OutDir <dossier>` produit
+`ForeverPulseCompanion.msi` et `ForeverPulseCompanion-Setup.exe` (noms stables pour le lien « latest » du site) ;
+version lue dans la ressource de l'exe (chaîne `0.10.0-rc.3`, numéro MSI `0.10.3` via `update.NumeroWindows`),
+ProductCode dérivé du numéro, UpgradeCode et GUID de composants inchangés (mise à niveau depuis 0.8.0).
+Assistant français ou anglais selon la langue de Windows ; il propose de fermer le Compagnon ouvert (`--quit`,
+jamais d'arrêt forcé). La désinstallation retire aussi les restes de la mise à jour automatique
+(`.old`, `.new`, `.refusee`). Construit et testé par la CI ; `Test.ps1 -Exe <exe> -OutDir <dossier>`.
+Le texte ci-dessous décrit la livraison 0.8.0 d'origine.
+
+## Installateur 0.8.0
 
 Point d'entrée : `ForeverPulseCompanion-0.8.0-Setup.exe`, assistant WinForms en français. Le MSI complet est embarqué, avec vérification SHA-256 avant utilisation et `MsiVerifyPackage`. Aucun téléchargement, script PowerShell exécuté à l'installation, programme annexe ni installateur tiers requis. Le framework .NET 4.x fourni par Windows 11 est utilisé. Architecture x64, manifeste `asInvoker`, compatibilité Windows 10/11 et mise à l'échelle DPI. L'installateur accepte seulement Windows 11 x64 (build ≥ 22000) ; le MSI vérifie aussi le build, l'architecture et le contexte utilisateur.
 

@@ -40,13 +40,17 @@ sous `min_version`).
 
 ## Publier une version
 
-1. Monter `Version` dans `internal/app/app.go`, construire :
-   `go build -trimpath -ldflags "-H windowsgui -s -w" -o ForeverPulseCompanion.exe ./cmd/forever-pulse-companion`.
-2. `go run ./outils/publier signer -cle <clé privée> -exe ForeverPulseCompanion.exe -out <dossier> [-min <version>]`
-   (vérifie que la clé correspond à `cle.go`, lit `--version`, revérifie la signature).
-3. Release GitHub `v<version>` sur `forever-pulse-companion`, **publiée comme « latest »**
-   (une pré-version est ignorée par `/releases/latest`), avec les trois fichiers
-   `ForeverPulseCompanion.exe`, `latest.json`, `latest.json.sig`.
+1. Monter `Version` dans `internal/app/app.go`, puis `go run ./outils/mkres <version>` (ressource de
+   version : numéro Windows croissant `update.NumeroWindows`, icône de l'installateur). Commit, tag `v<version>`,
+   push sur `main` du dépôt public.
+2. La CI (`.github/workflows/build.yml`) construit `ForeverPulseCompanion.exe`, `ForeverPulseCompanion.msi` et
+   `ForeverPulseCompanion-Setup.exe`, teste l'installateur sans installer et publie l'artefact.
+3. Télécharger l'artefact (`gh run download`) ; reconstruire l'exe en local
+   (`go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w"`) et vérifier la **même empreinte**.
+4. `go run ./outils/publier signer -cle <clé privée> -exe <exe de la CI> -out <dossier> [-min <version>]`.
+5. Release GitHub `v<version>` **publiée comme « latest »** (une pré-version est ignorée par
+   `/releases/latest`) avec les cinq fichiers : exe, MSI, Setup, `latest.json`, `latest.json.sig`.
+   Lien stable de l'installateur : `https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest/download/ForeverPulseCompanion-Setup.exe`.
 
 ## Limites
 

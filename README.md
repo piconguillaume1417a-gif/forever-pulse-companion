@@ -4,8 +4,10 @@ Windows companion of the **Forever Pulse** addon for *World of Warcraft: Forever
 the SavedVariables written by the addon and uploads them to https://forever-pulse.com.
 It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
 
-- **Download**: [latest release](https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest)
-  (`ForeverPulseCompanion.exe`, Windows 11 x64, per-user, no administrator rights).
+- **Download**: [ForeverPulseCompanion-Setup.exe](https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest/download/ForeverPulseCompanion-Setup.exe)
+  from the [latest release](https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest)
+  (Windows 11 x64, per-user, no administrator rights; English or French). Uninstall from
+  Windows Settings → Apps; settings and readings are kept.
 - **Automatic updates** (0.10.0): a daily signed check of the latest release, installed on next
   start or from the tray menu, with automatic rollback. See [docs/MISE-A-JOUR-AUTO.md](docs/MISE-A-JOUR-AUTO.md).
 - **Code signing**: see [CODE-SIGNING.md](CODE-SIGNING.md). Releases are currently unsigned;

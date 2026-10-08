@@ -3,7 +3,7 @@
 // (contrôles communs v6 : boîtes de dialogue et infobulles modernes ; DPI système ;
 // sans élévation).
 //
-//	go run ./outils/mkres 0.6.4
+//	go run ./outils/mkres 0.10.0-rc.3   (écrit aussi outils/installateur/setup.ico)
 package main
 
 import (
@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"wowsync/internal/icone"
+	"wowsync/internal/update"
 	"wowsync/outils/mkres/winres"
 	"wowsync/outils/mkres/winres/version"
 )
@@ -29,6 +30,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// 0.10.0 : la même icône pour l'installateur (csc /win32icon).
+	if f, err := os.Create("outils/installateur/setup.ico"); err == nil {
+		if err := icon.SaveICO(f); err != nil {
+			panic(err)
+		}
+		f.Close()
+	} else {
+		panic(err)
+	}
 	rs := &winres.ResourceSet{}
 	if err := rs.SetIcon(winres.ID(1), icon); err != nil {
 		panic(err)
@@ -36,6 +46,13 @@ func main() {
 	var vi version.Info
 	vi.SetFileVersion(ver)
 	vi.SetProductVersion(ver)
+	// 0.10.0 : numéro croissant même entre candidates (le MSI compare ces entiers).
+	n, err := update.NumeroWindows(ver)
+	if err != nil {
+		panic(err)
+	}
+	vi.FileVersion = [4]uint16{uint16(n[0]), uint16(n[1]), uint16(n[2]), 0}
+	vi.ProductVersion = vi.FileVersion
 	for k, v := range map[string]string{
 		version.ProductName: "Forever Pulse Companion", version.FileDescription: "Forever Pulse Companion",
 		version.InternalName: "ForeverPulseCompanion", version.OriginalFilename: "ForeverPulseCompanion.exe",

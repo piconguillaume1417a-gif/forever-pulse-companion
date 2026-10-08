@@ -1,21 +1,26 @@
 using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("Installation de Forever Pulse Companion")]
+// Version attributes come from the generated PackageInfo.cs (Build.ps1).
+[assembly: AssemblyTitle("Forever Pulse Companion Setup")]
 [assembly: AssemblyProduct("Forever Pulse Companion")]
 [assembly: AssemblyCompany("Forever Pulse")]
-[assembly: AssemblyVersion("0.8.0.0")]
-[assembly: AssemblyFileVersion("0.8.0.1")]
 
 internal static class Program
 {
+    // French when Windows is in French, English otherwise (0.10.0).
+    internal static readonly bool French = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "fr";
+    internal static string T(string fr, string en) { return French ? fr : en; }
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     internal static extern IntPtr FindWindow(string className, string title);
     [DllImport("msi.dll", CharSet = CharSet.Unicode)]
@@ -45,6 +50,23 @@ internal static class Program
     {
         return FindWindow("ForeverPulseCompanionTray", null) != IntPtr.Zero;
     }
+    // Asks the running companion to quit cleanly (its own --quit: icon removed,
+    // database closed), then waits up to 30 s. Never kills a process.
+    internal static bool QuitCompanion()
+    {
+        string exe = Path.Combine(InstallDirectory, "ForeverPulseCompanion.exe");
+        try
+        {
+            if (File.Exists(exe))
+                using (Process p = Process.Start(new ProcessStartInfo(exe, "--quit") { UseShellExecute = false, CreateNoWindow = true }))
+                    p.WaitForExit(10000);
+        }
+        catch (Exception) { return false; }
+        for (int i = 0; i < 60 && CompanionRunning(); i++) Thread.Sleep(500);
+        if (CompanionRunning()) return false;
+        Thread.Sleep(1500); // let the process finish closing its database
+        return true;
+    }
     internal static string Hash(string file)
     {
         using (SHA256 sha = SHA256.Create())
@@ -56,11 +78,11 @@ internal static class Program
         using (Stream input = Assembly.GetExecutingAssembly().GetManifestResourceStream("companion.msi"))
         using (Stream output = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            if (input == null) throw new InvalidDataException("Le paquet d'installation est absent.");
+            if (input == null) throw new InvalidDataException(T("Le paquet d'installation est absent.", "The installation package is missing."));
             input.CopyTo(output);
         }
         if (Hash(file) != PackageInfo.MsiHash || MsiVerifyPackage(file) != 0)
-            throw new InvalidDataException("Le paquet d'installation est endommagé. Téléchargez de nouveau l'installateur.");
+            throw new InvalidDataException(T("Le paquet d'installation est endommagé. Téléchargez de nouveau l'installateur.", "The installation package is damaged. Download the installer again."));
     }
 
     [STAThread]
@@ -123,7 +145,7 @@ internal sealed class SetupWindow : Form
     internal SetupWindow()
     {
         SuspendLayout();
-        Text = "Installation · Forever Pulse Companion 0.8.0";
+        Text = Program.T("Installation · Forever Pulse Companion ", "Setup · Forever Pulse Companion ") + PackageInfo.Version;
         AutoScaleDimensions = new SizeF(96F, 96F);
         AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(650, 540);
@@ -154,11 +176,11 @@ internal sealed class SetupWindow : Form
         Label subtitle = new Label();
         subtitle.SetBounds(106, 62, 480, 24);
         subtitle.ForeColor = Color.FromArgb(193, 206, 228);
-        subtitle.Text = "Version 0.8.0 · Windows 11 · 64 bits";
+        subtitle.Text = "Version " + PackageInfo.Version + " · Windows 11 · 64" + Program.T(" bits", "-bit");
         header.Controls.Add(subtitle);
 
-        AddLabel("Installer pour votre compte Windows", 30, 128, 590, 28, true);
-        AddLabel("Le compagnon et ses guides seront ajoutés ici :", 30, 164, 590, 25, false);
+        AddLabel(Program.T("Installer pour votre compte Windows", "Install for your Windows account"), 30, 128, 590, 28, true);
+        AddLabel(Program.T("Le Compagnon et ses guides seront ajoutés ici :", "The Companion and its guides will be added here:"), 30, 164, 590, 25, false);
         TextBox path = new TextBox();
         path.SetBounds(30, 193, 590, 32);
         path.Text = Program.InstallDirectory;
@@ -166,23 +188,24 @@ internal sealed class SetupWindow : Form
         path.TabStop = false;
         path.BackColor = Color.White;
         Controls.Add(path);
-        AddLabel("Votre configuration, votre jeton et vos relevés sont conservés.\nUn raccourci sera ajouté au menu Démarrer.\nLe démarrage avec Windows se règle dans le compagnon.", 30, 240, 590, 78, false);
+        AddLabel(Program.T("Votre configuration, votre connexion et vos relevés sont conservés.\nUn raccourci sera ajouté au menu Démarrer. Aucun droit administrateur.\nLe Compagnon se met ensuite à jour tout seul.",
+            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date."), 30, 240, 590, 78, false);
         desktop.SetBounds(30, 324, 590, 28);
-        desktop.Text = "Ajouter aussi un raccourci sur le Bureau";
+        desktop.Text = Program.T("Ajouter aussi un raccourci sur le Bureau", "Also add a desktop shortcut");
         desktop.Checked = true;
         Controls.Add(desktop);
         status.SetBounds(30, 363, 590, 54);
-        status.Text = "Fermez le compagnon depuis son icône près de l'horloge avant l'installation.";
+        status.Text = Program.T("Si le Compagnon est ouvert, l'installation le fermera puis vous proposera de le rouvrir.", "If the Companion is open, setup will close it and then offer to open it again.");
         Controls.Add(status);
         progress.SetBounds(30, 427, 590, 12);
         progress.Visible = false;
         Controls.Add(progress);
         close.SetBounds(342, 467, 130, 40);
-        close.Text = "Fermer";
+        close.Text = Program.T("Fermer", "Close");
         close.Click += delegate { Close(); };
         Controls.Add(close);
         install.SetBounds(487, 467, 133, 40);
-        install.Text = "Installer";
+        install.Text = Program.T("Installer", "Install");
         install.BackColor = Color.FromArgb(36, 88, 162);
         install.ForeColor = Color.White;
         install.FlatStyle = FlatStyle.Flat;
@@ -206,10 +229,21 @@ internal sealed class SetupWindow : Form
 
     private async void InstallClick(object sender, EventArgs e)
     {
-        if (Program.CompanionRunning())
+        if (!complete && Program.CompanionRunning())
         {
-            MessageBox.Show(this, "Le compagnon est ouvert. Choisissez Quitter dans le menu de son icône près de l'horloge, puis réessayez.", "Compagnon en cours", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            if (MessageBox.Show(this, Program.T("Le Compagnon est ouvert. Le fermer maintenant pour l'installer ? Aucun relevé n'est perdu.", "The Companion is running. Close it now to install? No reading is lost."),
+                    "Forever Pulse Companion", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
+                return;
+            status.Text = Program.T("Fermeture du Compagnon…", "Closing the Companion…");
+            install.Enabled = false;
+            bool closed = await Task.Run(new Func<bool>(Program.QuitCompanion));
+            install.Enabled = true;
+            if (!closed)
+            {
+                MessageBox.Show(this, Program.T("Le Compagnon ne s'est pas fermé. Choisissez Quitter dans le menu de son icône près de l'horloge, puis réessayez.", "The Companion did not close. Choose Quit in its icon menu next to the clock, then try again."),
+                    "Forever Pulse Companion", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
         }
         if (complete)
         {
@@ -218,19 +252,19 @@ internal sealed class SetupWindow : Form
                 Process.Start(new ProcessStartInfo(Path.Combine(Program.InstallDirectory, "ForeverPulseCompanion.exe")) { UseShellExecute = true });
                 Close();
             }
-            catch (Exception error) { MessageBox.Show(this, error.Message, "Ouverture impossible", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception error) { MessageBox.Show(this, error.Message, Program.T("Ouverture impossible", "Cannot open"), MessageBoxButtons.OK, MessageBoxIcon.Error); }
             return;
         }
         if (!Program.Windows11())
         {
-            MessageBox.Show(this, "Cet installateur nécessite Windows 11 en 64 bits.", "Windows non compatible", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, Program.T("Cet installateur nécessite Windows 11 en 64 bits.", "This installer requires 64-bit Windows 11."), Program.T("Windows non compatible", "Unsupported Windows"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
         installing = true;
         install.Enabled = close.Enabled = desktop.Enabled = false;
         progress.Style = ProgressBarStyle.Marquee;
         progress.Visible = true;
-        status.Text = "Installation en cours…";
+        status.Text = Program.T("Installation en cours…", "Installing…");
         string folder = Path.Combine(Path.GetTempPath(), "ForeverPulse-Setup-" + Guid.NewGuid().ToString("N"));
         string package = Path.Combine(folder, "companion.msi");
         string log = Path.Combine(folder, "installation.log");
@@ -252,18 +286,18 @@ internal sealed class SetupWindow : Form
                 }
             });
             if (result != 0 && result != 3010)
-                throw new InvalidOperationException("Windows Installer a renvoyé le code " + result + ".\nJournal : " + log);
+                throw new InvalidOperationException(Program.T("Windows Installer a renvoyé le code ", "Windows Installer returned code ") + result + ".\n" + Program.T("Journal : ", "Log: ") + log);
             string installed = Path.Combine(Program.InstallDirectory, "ForeverPulseCompanion.exe");
             if (Program.Hash(installed) != PackageInfo.CompanionHash)
-                throw new InvalidDataException("Le fichier installé ne correspond pas à la version attendue.\nJournal : " + log);
+                throw new InvalidDataException(Program.T("Le fichier installé ne correspond pas à la version attendue.", "The installed file does not match the expected version.") + "\n" + Program.T("Journal : ", "Log: ") + log);
             succeeded = complete = true;
-            install.Text = "Ouvrir";
-            status.Text = "Installation terminée. Cliquez sur Ouvrir pour lancer la version 0.8.0, ou sur Fermer pour la lancer plus tard.";
+            install.Text = Program.T("Ouvrir", "Open");
+            status.Text = Program.T("Installation terminée. Cliquez sur Ouvrir pour lancer la version ", "Setup complete. Click Open to start version ") + PackageInfo.Version + Program.T(", ou sur Fermer pour la lancer plus tard.", ", or Close to start it later.");
         }
         catch (Exception error)
         {
-            status.Text = "L'installation n'a pas abouti. Vous pouvez réessayer.";
-            MessageBox.Show(this, error.Message, "Installation interrompue", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            status.Text = Program.T("L'installation n'a pas abouti. Vous pouvez réessayer.", "Setup did not complete. You can try again.");
+            MessageBox.Show(this, error.Message, Program.T("Installation interrompue", "Setup interrupted"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {

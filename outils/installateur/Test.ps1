@@ -1,18 +1,26 @@
 # Tests only extract/read in the repository's .go-tmp directory.
 # They never install/uninstall, start the companion, or access credentials.
 [CmdletBinding()]
-param()
+param(
+    [string]$Exe = (Join-Path ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))) 'ForeverPulseCompanion.exe'),
+    [string]$OutDir = ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..')))
+)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $work=Join-Path $repo ('.go-tmp\installer-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
-$live=Join-Path $repo 'ForeverPulseCompanion.exe'
-$liveHash=(Get-FileHash -LiteralPath $live -Algorithm SHA256).Hash
+$Exe=[IO.Path]::GetFullPath($Exe)
+$OutDir=[IO.Path]::GetFullPath($OutDir)
+$info=[Diagnostics.FileVersionInfo]::GetVersionInfo($Exe)
+$msiVersion='{0}.{1}.{2}' -f $info.FileMajorPart,$info.FileMinorPart,$info.FileBuildPart
+# The in-service companion of this Windows account, if any, must stay untouched.
+$live=Join-Path $env:LOCALAPPDATA 'Programs\ForeverPulseCompanion\ForeverPulseCompanion.exe'
+$liveHash=if (Test-Path -LiteralPath $live) { (Get-FileHash -LiteralPath $live -Algorithm SHA256).Hash } else { $null }
 $runKey=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
 try { $startupBefore=if ($null -ne $runKey) { $runKey.GetValue('ForeverPulseCompanion') } else { $null } }
 finally { if ($null -ne $runKey) { $runKey.Dispose() } }
-$setup=Join-Path $repo 'ForeverPulseCompanion-0.8.0-Setup.exe'
+$setup=Join-Path $OutDir 'ForeverPulseCompanion-Setup.exe'
 function Assert([bool]$condition,[string]$message) { if (!$condition) { throw $message } }
 function RunExe([string]$file,[string]$arguments) {
     try { $p=Start-Process -FilePath $file -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru }
@@ -35,7 +43,7 @@ foreach ($action in @('FindRelatedProducts','AppSearch','LaunchConditions','Cost
 Assert ($planning.Contains('Startup ownership conditions: OK')) 'Native MSI startup guard failed'
 Assert ($planning.Contains('Install transaction executed: false')) 'Planning must never install'
 $msi=Join-Path $work 'companion.msi'
-Assert ((Get-FileHash -LiteralPath $msi).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo 'ForeverPulseCompanion-0.8.0.msi')).Hash) 'Embedded MSI differs from generated MSI'
+Assert ((Get-FileHash -LiteralPath $msi).Hash -eq (Get-FileHash -LiteralPath (Join-Path $OutDir 'ForeverPulseCompanion.msi')).Hash) 'Embedded MSI differs from generated MSI'
 $com=New-Object -ComObject WindowsInstaller.Installer
 $db=$com.OpenDatabase($msi,0)
 function ComProperty($target,[string]$name,[object[]]$arguments=@()) {
@@ -61,14 +69,14 @@ function Query([string]$sql) {
 try {
     $props=@{}
     foreach ($row in (Query 'SELECT `Property`, `Value` FROM `Property`')) { $props[$row[0]]=$row[1] }
-    Assert ($props.ProductVersion -eq '0.8.0') 'Wrong version'
+    Assert ($props.ProductVersion -eq $msiVersion) 'Wrong version'
     Assert (!$props.ContainsKey('ALLUSERS')) 'Package must default to per-user'
     Assert ($props.MSIRESTARTMANAGERCONTROL -eq 'Disable') 'No process may be terminated by restart manager'
     $signatureRows=@(Query 'SELECT `Signature` FROM `Signature`')
     Assert ($signatureRows.Count -eq 0) 'AppSearch requires an empty Signature table for registry-only searches'
     $fileRows=@(Query 'SELECT `File`, `Component_`, `FileName`, `Version` FROM `File`')
     Assert ($fileRows.Count -eq 3) 'Unexpected packaged files'
-    Assert (@($fileRows | Where-Object { $_[0] -eq 'CompanionExe' -and $_[3] -eq '0.8.0.0' }).Count -eq 1) 'Wrong executable version'
+    Assert (@($fileRows | Where-Object { $_[0] -eq 'CompanionExe' -and $_[3] -eq "$msiVersion.0" }).Count -eq 1) 'Wrong executable version'
     $registryRows=@(Query 'SELECT `Root`, `Key`, `Name` FROM `Registry`')
     Assert ($registryRows.Count -eq 3) 'Unexpected registry writes'
     foreach ($row in $registryRows) {
@@ -79,7 +87,9 @@ try {
     Assert ($directories.INSTALLDIR[1] -eq 'ProgramsDir' -and $directories.ProgramsDir[1] -eq 'LocalAppDataFolder') 'Install location must be per-user'
     Assert (!$directories.ContainsKey('AppDataFolder')) 'Roaming application data must remain outside MSI ownership'
     foreach ($row in (Query 'SELECT `FileName`, `DirProperty`, `InstallMode` FROM `RemoveFile`')) {
-        Assert ([string]::IsNullOrEmpty($row[0]) -and $row[2] -eq '2' -and $row[1] -in @('StartMenuDir','INSTALLDIR')) 'Uninstall may remove only empty owned folders'
+        # Empty owned folders, plus the updater's own leftovers next to the program (never the program).
+        $leftover=$row[0] -in @('FPC~1.OLD|ForeverPulseCompanion.exe.old','FPC~1.NEW|ForeverPulseCompanion.exe.new','FPC~1.REF|ForeverPulseCompanion.exe.refusee') -and $row[1] -eq 'INSTALLDIR'
+        Assert (($leftover -or ([string]::IsNullOrEmpty($row[0]) -and $row[1] -in @('StartMenuDir','INSTALLDIR'))) -and $row[2] -eq '2') 'Uninstall may remove only empty owned folders and updater leftovers'
     }
     $shortcuts=@(Query 'SELECT `Directory_`, `Target` FROM `Shortcut`')
     Assert ($shortcuts.Count -eq 2) 'Start-menu and optional desktop shortcuts expected'
@@ -124,8 +134,8 @@ $extracted=Join-Path $work 'files'
 New-Item -ItemType Directory $extracted | Out-Null
 & "$env:WINDIR\System32\expand.exe" $cab '-F:*' $extracted > (Join-Path $work 'expand.log')
 Assert ($LASTEXITCODE -eq 0) 'Cabinet extraction failed'
-foreach ($pair in @(@('CompanionExe','ForeverPulseCompanion-0.8.0.exe'),@('GuideFR','LISEZMOI.md'),@('GuideEN','README.md'))) {
-    Assert ((Get-FileHash -LiteralPath (Join-Path $extracted $pair[0])).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo $pair[1])).Hash) ('Packaged content mismatch: '+$pair[0])
+foreach ($pair in @(@('CompanionExe',$Exe),@('GuideFR',(Join-Path $repo 'LISEZMOI.md')),@('GuideEN',(Join-Path $repo 'README.md')))) {
+    Assert ((Get-FileHash -LiteralPath (Join-Path $extracted $pair[0])).Hash -eq (Get-FileHash -LiteralPath $pair[1]).Hash) ('Packaged content mismatch: '+$pair[0])
 }
 RunExe $setup ('--preview "'+(Join-Path $work 'preview.png')+'"')
 Assert ((Get-Item -LiteralPath (Join-Path $work 'preview.png')).Length -gt 5000) 'Preview render is empty'
@@ -133,7 +143,7 @@ $runKey=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\W
 try { $startupAfter=if ($null -ne $runKey) { $runKey.GetValue('ForeverPulseCompanion') } else { $null } }
 finally { if ($null -ne $runKey) { $runKey.Dispose() } }
 Assert ($startupAfter -eq $startupBefore) 'Existing startup entry was changed'
-Assert ((Get-FileHash -LiteralPath $live).Hash -eq $liveHash) 'In-service executable was changed'
+if ($null -ne $liveHash) { Assert ((Get-FileHash -LiteralPath $live).Hash -eq $liveHash) 'In-service executable was changed' }
 Write-Output 'PASS: native MSI search/conditions/costing; missing-Signature regression rejected; startup ownership conditions; package validation; embedded MSI; per-user paths; exact payload and guides; shortcut targets; uninstall boundaries; version guards; upgrade identity; preview; existing live executable/startup unchanged.'
 Write-Output "Test files: $work"
 Write-Output 'No installation, uninstallation or companion launch executed.'

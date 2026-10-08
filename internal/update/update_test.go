@@ -265,3 +265,25 @@ func TestCopieBloqueeParWindows(t *testing.T) {
 		t.Fatal("version bloquée non refusée (elle serait réessayée à chaque démarrage)")
 	}
 }
+
+// Le numéro Windows suit l'ordre des versions (le MSI s'en sert pour les mises à niveau).
+func TestNumeroWindows(t *testing.T) {
+	ordre := []string{"0.8.0", "0.9.0-rc.2", "0.9.0", "0.10.0-rc.1", "0.10.0-rc.3", "0.10.0", "0.10.1-rc.1", "0.10.1", "1.0.0"}
+	var avant [3]int
+	for i, v := range ordre {
+		n, err := NumeroWindows(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i > 0 && !(n[0] > avant[0] || n[0] == avant[0] && (n[1] > avant[1] || n[1] == avant[1] && n[2] > avant[2])) {
+			t.Fatalf("%s → %v pas après %v", v, n, avant)
+		}
+		avant = n
+	}
+	if n, _ := NumeroWindows("0.10.0-rc.3"); n != [3]int{0, 10, 3} {
+		t.Fatal(n)
+	}
+	if _, err := NumeroWindows("0.10.65-rc.1"); err == nil {
+		t.Fatal("hors bornes accepté")
+	}
+}

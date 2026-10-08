@@ -23,19 +23,35 @@ jobs:
         run: go vet ./...
       - name: Test
         run: go test ./... -count=1
-      - name: Build
+      - name: Build companion
         shell: pwsh
         run: |
+          # -trimpath and -buildvcs=false: same bytes as a local build of the same commit.
           $v = (Select-String -Path internal/app/app.go -Pattern 'Version = "([^"]+)"').Matches[0].Groups[1].Value
-          go build -trimpath -ldflags "-H windowsgui -s -w" -o ForeverPulseCompanion.exe ./cmd/forever-pulse-companion
-          $got = (./ForeverPulseCompanion.exe --version | Out-String).Trim()
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -trimpath -buildvcs=false -ldflags "-H windowsgui -s -w" -o dist/ForeverPulseCompanion.exe ./cmd/forever-pulse-companion
+          $got = (./dist/ForeverPulseCompanion.exe --version | Out-String).Trim()
           if ($got -ne $v) { throw "version $got, expected $v" }
-          (Get-FileHash ForeverPulseCompanion.exe -Algorithm SHA256).Hash
+          $info = [Diagnostics.FileVersionInfo]::GetVersionInfo("$PWD/dist/ForeverPulseCompanion.exe")
+          if ($info.ProductVersion -ne $v) { throw "resource version $($info.ProductVersion), expected $($v): run outils/mkres" }
+      - name: Build installer
+        shell: pwsh
+        run: ./outils/installateur/Build.ps1 -Exe dist/ForeverPulseCompanion.exe -OutDir dist
+      - name: Test installer (no installation)
+        shell: pwsh
+        run: ./outils/installateur/Test.ps1 -Exe dist/ForeverPulseCompanion.exe -OutDir dist
+      - name: Hashes
+        shell: pwsh
+        run: Get-FileHash dist/* -Algorithm SHA256 | Format-Table Hash, Path -AutoSize | Out-String -Width 300
       - uses: actions/upload-artifact@v4
         with:
           name: ForeverPulseCompanion
-          path: ForeverPulseCompanion.exe
+          path: |
+            dist/ForeverPulseCompanion.exe
+            dist/ForeverPulseCompanion.msi
+            dist/ForeverPulseCompanion-Setup.exe
           if-no-files-found: error
-      # After SignPath approval: submit the artifact above with
-      # signpath/github-action-submit-signing-request (organization id and
-      # API token stored as repository secrets), then attach the signed exe.
+      # After SignPath approval: sign ForeverPulseCompanion.exe, rebuild the MSI and
+      # setup around the signed exe, then sign both (SignPath deep signing), with
+      # signpath/github-action-submit-signing-request (organization id and API token
+      # stored as repository secrets).

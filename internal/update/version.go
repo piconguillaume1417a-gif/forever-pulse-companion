@@ -71,3 +71,22 @@ func compare(a, b version) int {
 	}
 	return a.rc - b.rc
 }
+
+// NumeroWindows : numéro à trois champs du programme pour Windows (ressource de
+// version et paquet MSI), qui ne connaissent que des entiers. Il croît dans le même
+// ordre que Plus : CORRECTIF*1000 + N pour « -rc.N », CORRECTIF*1000 + 999 pour la
+// finale. 0.10.0-rc.3 → 0.10.3 ; 0.10.0 → 0.10.999 ; 0.10.1-rc.1 → 0.10.1001.
+func NumeroWindows(s string) ([3]int, error) {
+	v, err := lireVersion(s)
+	if err != nil {
+		return [3]int{}, err
+	}
+	rc := v.rc
+	if rc == 0 {
+		rc = 999
+	}
+	if v.num[0] > 255 || v.num[1] > 255 || v.num[2] > 64 || v.rc > 998 {
+		return [3]int{}, fmt.Errorf("version %q hors des bornes de Windows Installer", s)
+	}
+	return [3]int{v.num[0], v.num[1], v.num[2]*1000 + rc}, nil
+}

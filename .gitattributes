@@ -1,0 +1,7 @@
+# Same bytes on every checkout (Windows CI included): reproducible builds.
+* text=auto eol=lf
+*.syso binary
+*.png binary
+*.exe binary
+*.msi binary
+*.ico binary
