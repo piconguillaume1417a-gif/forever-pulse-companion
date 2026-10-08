@@ -1,0 +1,330 @@
+{
+  "_regle": "Jour Auctionator 2467 (date nominale 2026-10-03). Fenêtre prudente : jours UTC 2466 à 2468 inclus depuis le 2020-01-01, horloge du client (ts + dc) ou tl. Contrat §4.",
+  "cas": [
+    {
+      "id": "J-a",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "marche": "18-beta-90-4619-PVP-Alliance",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    },
+    {
+      "id": "J-b",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791021600|0|120|1791021000|18|1|90|PVP|PvP|4619|Alliance|1453|340\n1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1455|340"
+      },
+      "attendu": {
+        "marche": "18-beta-90-4619-PVP-Alliance",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    },
+    {
+      "id": "J-c",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Horde|1446|340"
+      },
+      "attendu": {
+        "marche": "18-beta-90-4619-PVP-Neutral",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    },
+    {
+      "id": "J-d",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791021600|0|120|1791021000|18|1|90|PVP|PvP|4619|Horde|1446|340\n1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1446|340"
+      },
+      "attendu": {
+        "marche": "18-beta-90-4619-PVP-Neutral",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    },
+    {
+      "id": "J-e",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791021600|0|120|1791021000|18|1|90|PVP|PvP|4619|Horde|1454|340\n1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Horde|1446|340"
+      },
+      "attendu": {
+        "refus": "jour_multi_marches"
+      }
+    },
+    {
+      "id": "J-f",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340\n1791147600|0|120|1791147000|18|1|90|PVP|PvP|4619|Horde|1454|340"
+      },
+      "attendu": {
+        "refus": "jour_multi_marches"
+      }
+    },
+    {
+      "id": "J-g",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340\n1791248400|0|120|1791247800|18|1|90|PVP|PvP|4619|Horde|1454|340"
+      },
+      "attendu": {
+        "marche": "18-beta-90-4619-PVP-Alliance",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    },
+    {
+      "id": "J-h",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance||340"
+      },
+      "attendu": {
+        "refus": "jour_hdv_non_reconnu"
+      }
+    },
+    {
+      "id": "J-i",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1429|340"
+      },
+      "attendu": {
+        "refus": "jour_hdv_non_reconnu"
+      }
+    },
+    {
+      "id": "J-j",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP||Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "jour_identite_incomplete"
+      }
+    },
+    {
+      "id": "J-k",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791021600|0|120|1791021000|18|1|90|PVP|PvP|4613|Alliance|1453|340\n1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "jour_multi_marches"
+      }
+    },
+    {
+      "id": "J-l",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1790612400|0|120|1790611800|18|1|90|PVP|PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "jour_sans_note"
+      }
+    },
+    {
+      "id": "J-m",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790942400,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "avant_note"
+      }
+    },
+    {
+      "id": "J-n",
+      "cle": "ClassicBetaPvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|Classic Beta PvP|4613|Horde|1454|340"
+      },
+      "attendu": {
+        "marche": "18-beta-90-4613-PVP-Horde",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    },
+    {
+      "id": "J-o",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340\n1791342000|0|120|1791154800|18|1|90|PVP|PvP|4619|Horde|1454|340"
+      },
+      "attendu": {
+        "refus": "jour_multi_marches"
+      }
+    },
+    {
+      "id": "J-p",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|0|90|PVP|PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "jour_identite_incomplete"
+      }
+    },
+    {
+      "id": "J-q",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791021600|0|120|1791021000|18|1|90|PVP|PvP|4619|Alliance|1453|340\n1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|341"
+      },
+      "attendu": {
+        "refus": "version_auctionator_multiple"
+      }
+    },
+    {
+      "id": "J-r",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90||PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "jour_identite_incomplete"
+      }
+    },
+    {
+      "id": "J-s",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340\n2026-10-03|PvP|4619|Alliance|1453"
+      },
+      "attendu": {
+        "refus": "note_illisible"
+      }
+    },
+    {
+      "id": "J-t",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": null,
+      "attendu": {
+        "refus": "note_absente"
+      }
+    },
+    {
+      "id": "J-u",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|Autre|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "refus": "royaume_sans_note"
+      }
+    },
+    {
+      "id": "J-v",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_classic_beta_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|1|90|PVP|PvP|4619|Alliance|1453|340\n1791162000|-7200|120|1791161400|18|1|90|PVP|PvP|4619|Horde|1454|340"
+      },
+      "attendu": {
+        "refus": "jour_multi_marches"
+      }
+    },
+    {
+      "id": "J-w",
+      "cle": "PvP",
+      "jour": 2467,
+      "dossier": "_forever_",
+      "hdv": {
+        "v": 2,
+        "depuis": 1790035200,
+        "notes": "1791044400|0|120|1791043800|18|0|90|PVP|PvP|4619|Alliance|1453|340"
+      },
+      "attendu": {
+        "marche": "18-live-90-4619-PVP-Alliance",
+        "day_basis": "auctionator/340/db8/unverified"
+      }
+    }
+  ]
+}

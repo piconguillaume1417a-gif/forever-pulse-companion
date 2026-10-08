@@ -1,0 +1,10 @@
+# Fichiers réels : noms de joueurs, jamais commités.
+testdata/reel/
+*.exe
+/*.msi
+/wowsync
+/.go-cache/
+/.go-tmp/
+
+/.test-tmp/
+/*.log

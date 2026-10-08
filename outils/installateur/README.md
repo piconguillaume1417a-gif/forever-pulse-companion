@@ -1,0 +1,34 @@
+# Installateur 0.8.0
+
+Point d'entrée : `ForeverPulseCompanion-0.8.0-Setup.exe`, assistant WinForms en français. Le MSI complet est embarqué, avec vérification SHA-256 avant utilisation et `MsiVerifyPackage`. Aucun téléchargement, script PowerShell exécuté à l'installation, programme annexe ni installateur tiers requis. Le framework .NET 4.x fourni par Windows 11 est utilisé. Architecture x64, manifeste `asInvoker`, compatibilité Windows 10/11 et mise à l'échelle DPI. L'installateur accepte seulement Windows 11 x64 (build ≥ 22000) ; le MSI vérifie aussi le build, l'architecture et le contexte utilisateur.
+
+## Construire
+
+Prérequis : binaire **déjà validé** `ForeverPulseCompanion-0.8.0.exe`, version de produit 0.8.0. Les outils utilisés sont le compilateur système `Microsoft.NET\Framework64\v4.0.30319\csc.exe`, `makecab.exe` et l'API Windows Installer. Le script a été exécuté avec PowerShell 7 (`pwsh`) dans ce dépôt. Il ne modifie aucune politique d'exécution Windows.
+
+```powershell
+pwsh -NoProfile -File .\outils\installateur\Build.ps1
+pwsh -NoProfile -File .\outils\installateur\Test.ps1
+```
+
+La sortie comprend `ForeverPulseCompanion-0.8.0-Setup.exe` et `ForeverPulseCompanion-0.8.0.msi` à la racine, ignorés par Git. Le paquet contient exactement le compagnon, `LISEZMOI.md` et `README.md`. Le script refuse une autre version et compile avec les avertissements traités comme erreurs. Les sources et résultats intermédiaires sont dans `.go-tmp`. Les empreintes du MSI et du compagnon sont intégrées à l'assistant. Les deux livrables ne sont pas signés.
+
+## Installation et retrait
+
+Le MSI utilise un contexte utilisateur, `%LOCALAPPDATA%\Programs\ForeverPulseCompanion`, trois ancrages HKCU propres à l'installateur et des raccourcis utilisateur. La configuration et les données `%APPDATA%\ForeverPulse\Companion` ne sont pas des composants du paquet. Aucun accès aux identifiants Windows ni aux fichiers du jeu. Aucun envoi HTTP ni lancement automatique. L'assistant refuse de commencer si une fenêtre `ForeverPulseCompanionTray` existe ; l'utilisateur quitte normalement le compagnon. Le gestionnaire de redémarrage MSI ne termine aucun processus.
+
+Le lancement ultérieur du compagnon réutilise la configuration et le jeton, peut reprendre les envois, et gère lui-même le démarrage Windows. Les installations futures utilisent le même `UpgradeCode`, de nouveaux `ProductCode` par version et les mêmes identifiants de composants lorsque leur chemin/usage est inchangé. La 0.8.0 détecte une version MSI plus récente et refuse un retour arrière ; relancer l'assistant sur la même version demande une réparation des fichiers. Le raccourci Bureau est un composant optionnel dont la condition est réévaluée.
+
+La désinstallation dans Windows retire les fichiers/raccourcis possédés par le MSI et seulement des dossiers devenus vides. Elle conserve les données et le jeton. La suppression de l'entrée de démarrage est conditionnée à `Installed`, `REMOVE="ALL"`, l'absence d'une mise à niveau en cours, et l'égalité sans distinction de casse entre la valeur HKCU trouvée et `"[INSTALLDIR]ForeverPulseCompanion.exe" --tray`. L'action utilise le `reg.exe` Windows signé depuis `System64Folder`, sans script ni helper personnalisé. Une entrée qui pointe encore vers le dépôt 0.7.4 n'est pas supprimée. Quitter le compagnon avant toute désinstallation évite les fichiers en cours d'utilisation.
+
+Le bouton de désinstallation interne au compagnon reste distinct et conserve sa suppression historique des données et du jeton.
+
+## Vérifications sans installation
+
+`Test.ps1` extrait l'archive embarquée via `--verify`, valide le paquet avec l'API native, vérifie les propriétés/tables MSI, l'emplacement utilisateur, les fichiers exacts, les cibles des raccourcis, les limites de suppression, les conditions de version/mise à niveau et la propriété du démarrage. Il compare les SHA-256 du compagnon et des guides extraits avec leurs originaux. Une session MSI en mémoire (`MsiOpenPackageEx`, état installé ignoré) exécute `FindRelatedProducts`, `AppSearch`, `LaunchConditions`, `CostInitialize`, `FileCost`, `CostFinalize` et les deux actions de résolution de propriétés. Les conditions natives du nettoyage du démarrage sont évaluées avec une entrée correspondante, sa variante de casse, un chemin vers le dépôt, des arguments différents, une valeur absente et une mise à niveau. Aucune transaction d'installation, copie vers le dossier de programme, écriture de registre ou création de raccourci n'est exécutée. Il rend la fenêtre via `--preview` sans fenêtre visible, puis vérifie que l'exécutable en service et l'entrée de démarrage accessibles au compte de test n'ont pas changé. Les dossiers de test sont créés sous `.go-tmp`, avec un identifiant unique. Un exécutable de test refusé aléatoirement par le contrôle d'application est relancé à l'identique une fois ; aucun contournement de politique.
+
+**Correction de l'installateur, révision de fichier 0.8.0.1 (03/10/2026) :** le journal de l'essai utilisateur à 22:17:24 montrait le code global 1603 et l'erreur interne 2228, table `Signature` absente dans `AppSearch`. Le paquet initial était incorrect ; les contrôles de structure/extraction ne couvraient pas l'exécution de cette étape. La table `Signature` est maintenant présente et vide, comme requis pour ces recherches de valeurs de registre. Le nouveau test natif reproduit `AppSearch: 1603` sur une copie de MSI privée de cette table, puis passe sur le paquet corrigé. Le test vérifie aussi l'absence de signatures de fichiers, afin de conserver les recherches de registre. Le binaire du compagnon reste la même 0.8.0, SHA-256 `8B9977BDCDE96008CE21EF850B050B89ECA4D5D021F45ADFCDD8EF9CFEDDDB2B`.
+
+Les contrôles d'extraction, de structure MSI, d'intégrité et de rendu ont passé sur Windows 11 build 26200 le 03/10/2026. Une extraction administrative supplémentaire (`msiexec /a`) a échoué dans le sandbox : accès refusé à `C:\Windows\Installer\inprogressinstallinfo.ipi`, erreurs 2503/2502. La vérification finale lit et extrait directement le cabinet sans demander d'installation. **Installation réelle, réparation et désinstallation sur un compte de test Windows hors sandbox restent non exécutées**, afin de préserver le compagnon en service. Le MSI n'a pas reçu de validation ICE complète faute de SDK/outils ICE installés.
+
+Références Microsoft : [contexte d'installation](https://learn.microsoft.com/en-us/windows/win32/msi/installation-context), [tables des composants](https://learn.microsoft.com/en-us/windows/win32/msi/component-table), [manifestes](https://learn.microsoft.com/en-us/windows/win32/sbscs/application-manifests), [installation administrative](https://learn.microsoft.com/en-us/windows/win32/msi/administrative-installation), [table Signature obligatoire pour AppSearch](https://learn.microsoft.com/en-us/windows/win32/msi/appsearch-action).
