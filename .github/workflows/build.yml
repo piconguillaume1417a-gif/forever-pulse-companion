@@ -13,6 +13,9 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      # The runner has gcc; local builds have none. Pure Go on both sides: same bytes.
+      CGO_ENABLED: '0'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
