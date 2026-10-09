@@ -10,8 +10,11 @@ It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
   Windows Settings → Apps; settings and readings are kept.
 - **Automatic updates** (0.10.0): a daily signed check of the latest release, installed on next
   start or from the tray menu, with automatic rollback. See [docs/MISE-A-JOUR-AUTO.md](docs/MISE-A-JOUR-AUTO.md).
-- **Code signing**: see [CODE-SIGNING.md](CODE-SIGNING.md). Releases are currently unsigned;
-  Windows Smart App Control may block them.
+- **Code signing**: free code signing provided by [SignPath.io](https://about.signpath.io/),
+  certificate by [SignPath Foundation](https://signpath.org/) (application pending: releases are
+  unsigned until approval; Windows Smart App Control may block them). Policy: [CODE-SIGNING.md](CODE-SIGNING.md).
+- **Privacy**: [privacy policy](CODE-SIGNING.md#privacy-policy). Remove an observed character from the
+  site: [foreverpulsesupport@gmail.com](mailto:foreverpulsesupport@gmail.com).
 - **License**: [MIT](LICENSE).
 
 Build: `go build -trimpath -ldflags "-H windowsgui -s -w" -o ForeverPulseCompanion.exe ./cmd/forever-pulse-companion` (Go 1.24).

@@ -26,6 +26,16 @@ This program will not transfer any information to other networked systems unless
 specifically requested by the user or the person installing or operating it, except:
 
 - the readings written by the Forever Pulse addon, sent to https://forever-pulse.com
-  with the installation's upload credential, as described in README.md;
+  with the installation's upload credential: characters seen in public channel rosters
+  and `/who` responses (name, class, race, sex, level, realm, zone, guild, faction),
+  character statistics and talents, and auction prices when that source is enabled;
 - a daily check of the latest release on github.com (no credential, no game data);
   it can be disabled with `auto_update = false` in `config.toml`.
+
+Never collected: chat, private or custom channels, Battle.net or account identifiers,
+file paths, Companion settings, passwords.
+
+- **Stop sending**: revoke the installation from your Forever Pulse account.
+- **Erase local data**: "Uninstall…" in the Companion deletes its credential and local data.
+- **Remove an observed character from the site**: email
+  [foreverpulsesupport@gmail.com](mailto:foreverpulsesupport@gmail.com); no account needed.
