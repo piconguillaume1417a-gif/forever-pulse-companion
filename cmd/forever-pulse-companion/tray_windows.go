@@ -316,6 +316,22 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			annoncer(v)
 		}
 	}
+	// Contenu des lots envoyés depuis plus de 3 jours : effacé 2 minutes après le
+	// démarrage, puis une fois par jour (identifiants et compteurs gardés).
+	purger := func() {
+		attente := 2 * time.Minute
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(attente):
+			}
+			attente = 24 * time.Hour
+			if _, err := a.PurgeLots(ctx); err != nil && ctx.Err() == nil {
+				log.Printf("purge : %v", err)
+			}
+		}
+	}
 	desinstaller := func() {
 		if !w.Confirm(i18n.T("uninstall.confirm", dir), i18n.T("dlg.uninstall")) {
 			return
@@ -396,6 +412,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 	}, func() {
 		refresh()
 		go connecter(true)
+		go purger()
 		if _, err := a.Token(); err != nil {
 			t.Notify(i18n.T("notify.notoken", winui.AppName), i18n.T("notify.howto"), false)
 		}

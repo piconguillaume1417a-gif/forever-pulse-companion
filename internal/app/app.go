@@ -771,6 +771,43 @@ func LeverBlocageJeton(s *store.Store) bool {
 }
 
 // SetToken enregistre un nouveau jeton et lève le blocage « jeton ».
+// DelaiPurge : le contenu d'un lot envoyé est gardé trois jours, puis vidé
+// (identifiant et compteurs restent). Décision du propriétaire, 10 octobre 2026.
+const DelaiPurge = 3 * 24 * time.Hour
+
+// PurgeLots vide, par petites tranches, le contenu des lots envoyés depuis plus de
+// DelaiPurge, puis rend la place au disque. Rien de ce qui attend l'envoi n'est
+// touché. Appelée en fond peu après le démarrage, puis une fois par jour.
+func (a *App) PurgeLots(ctx context.Context) (int, error) {
+	avant := a.Now().Add(-DelaiPurge).Unix()
+	total := 0
+	for ctx.Err() == nil {
+		n, err := a.Store.PurgeLotsEnvoyes(avant, 200)
+		total += n
+		if err != nil {
+			return total, err
+		}
+		if n < 200 {
+			break
+		}
+		// Laisse passer les envois et la fenêtre entre deux tranches.
+		select {
+		case <-ctx.Done():
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return total, err
+	}
+	if err := a.Store.Compacte(); err != nil {
+		return total, err
+	}
+	if total > 0 {
+		a.Log.Printf("purge : contenu de %d lots envoyés depuis plus de 3 jours effacé (identifiants et compteurs gardés), base compactée", total)
+	}
+	return total, nil
+}
+
 func (a *App) SetToken(t string) error {
 	if err := a.SaveToken(t); err != nil {
 		return err
