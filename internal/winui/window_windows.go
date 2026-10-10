@@ -23,15 +23,15 @@ const windowClass = "ForeverPulseCompanionWindow"
 
 // Identifiants des commandes de la fenêtre (mêmes valeurs qu'en 0.5.0).
 const (
-	CmdEnvoyer      = vue.Envoyer
-	CmdColler       = vue.Coller
-	CmdJournal      = vue.Journal
-	CmdPage         = vue.Page
-	CmdDemarrage    = vue.Demarrage
-	CmdEffacer      = vue.Effacer
-	CmdDesinstaller = vue.Desinstaller
-	CmdReduire      = vue.Reduire
-	CmdQuitter      = vue.Quitter
+	CmdEnvoyer       = vue.Envoyer
+	CmdJournal       = vue.Journal
+	CmdPage          = vue.Page
+	CmdDemarrage     = vue.Demarrage
+	CmdEffacer       = vue.Effacer
+	CmdDesinstaller  = vue.Desinstaller
+	CmdReduire       = vue.Reduire
+	CmdQuitter       = vue.Quitter
+	CmdInstallations = vue.Installations
 )
 
 var (
@@ -568,10 +568,6 @@ func windowProc(hwnd, m, wparam, lparam uintptr) uintptr {
 			}
 		case vkEscape:
 			w.Hide()
-		case vkV:
-			if touche(vkControl) {
-				w.activer(vue.Coller)
-			}
 		}
 		return 0
 	case wmSettingChg:

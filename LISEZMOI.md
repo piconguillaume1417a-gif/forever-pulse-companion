@@ -129,7 +129,7 @@ Depuis la 0.6.0, la fenêtre suit le thème clair ou sombre de Windows (et chang
 - **Trois compteurs** : lots envoyés, en attente, refusés. En attente s'affiche en orange et refusés en rouge dès qu'ils ne sont pas nuls.
 - **Dernier envoi** : date, nombre de lots et de personnages.
 - **Personnages distincts observés** : une ligne par périmètre, « depuis le … » et le nombre. Ce nombre n'est jamais additionné entre périmètres. Au-delà de quatre périmètres, la dernière ligne indique combien d'autres existent ; le survol de cette ligne les liste.
-- **Boutons** : **Envoyer maintenant** (en couleur), **Connecter à Forever Pulse**, **Coller le jeton** (secours avancé), **Ouvrir le journal**. Sans autorisation, ou si le site l'a refusée, **Connecter à Forever Pulse** passe en premier et en couleur. Pendant un envoi, le bouton affiche « Envoi… » et ne se clique pas deux fois.
+- **Boutons** : **Envoyer maintenant** (en couleur), **Connecter à Forever Pulse**, **Gérer les installations** (votre compte sur le site), **Ouvrir le journal**. Sans autorisation, ou si le site l'a refusée, **Connecter à Forever Pulse** passe en premier et en couleur. Pendant un envoi, le bouton affiche « Envoi… » et ne se clique pas deux fois.
 - **Lancer au démarrage de Windows** : un interrupteur, allumé par défaut. À l'ouverture de session, le compagnon démarre discrètement, avec l'icône seule.
 - **FR / EN** : la langue. Tant qu'aucune langue n'a été choisie, le compagnon est en anglais ; un clic sur FR le passe en français. Le choix s'applique tout de suite à la fenêtre, au menu de l'icône et aux notifications, et il est gardé dans `config.toml` (`language = 'fr'` ou `'en'`). Le journal reste en français.
 - **En bas à gauche**, les actions rares : **Effacer les données…** (après confirmation : vide la file d'envoi, le cumul et la liste des fichiers déjà lus ; les lots pas encore envoyés sont perdus ; le jeton et les réglages restent) et **Désinstaller…** (voir plus bas). Le lien passe en rouge au survol.
@@ -137,7 +137,7 @@ Depuis la 0.6.0, la fenêtre suit le thème clair ou sombre de Windows (et chang
 
 Chaque bouton a une infobulle qui dit ce qu'il fait. Les confirmations nomment l'action (« Effacer » ou « Désinstaller », face à « Annuler », choisi par défaut).
 
-Au clavier : **Tab** et **Maj+Tab** (ou les flèches) passent d'un bouton à l'autre, **Entrée** ou **Espace** le déclenche, **Ctrl+V** colle le jeton, **Échap** ferme la fenêtre.
+Au clavier : **Tab** et **Maj+Tab** (ou les flèches) passent d'un bouton à l'autre, **Entrée** ou **Espace** le déclenche, **Échap** ferme la fenêtre.
 
 ### Léger en fond
 
@@ -149,7 +149,7 @@ La fenêtre n'existe que lorsqu'elle est ouverte : la fermer libère tout ce qu'
 - **Clic droit** : un menu affiche l'état et propose :
   - **Ouvrir Forever Pulse Companion** (en gras : c'est aussi le clic gauche) ;
   - **Envoyer maintenant** ;
-  - **Coller le jeton** ;
+  - **Connecter à Forever Pulse**, **Annuler la connexion**, **Gérer les installations** ;
   - **Ouvrir le journal** ;
   - **Lancer au démarrage de Windows** ;
   - **Quitter**.
@@ -162,16 +162,13 @@ Si vous relancez l'exécutable alors qu'il tourne déjà, sa fenêtre revient si
 | orange | des lots attendent (coupure réseau, site indisponible, quota) : nouvel essai automatique, de 30 s à 30 min |
 | rouge | une action de votre part est nécessaire : jeton absent ou refusé, source désactivée par le site, version du site incompatible, lots refusés |
 
-## Avancé : jeton manuel de secours
+## Relier le compagnon à votre compte
 
-Le parcours normal utilise **Connecter à Forever Pulse**. Les étapes suivantes
-restent réservées au secours manuel, dans **Avancé : jeton manuel** sur le site.
-
-1. Sur le site, ouvrez **Account → Companion installations → Advanced: manual token** (`https://forever-pulse.com/account/companion`), donnez un nom au jeton (par exemple le nom du PC) et cliquez sur **Create token**.
-2. Le jeton (`fpc_…`) n'est affiché **qu'une seule fois**. Cliquez sur **Copy token**.
-3. Dans la fenêtre du compagnon, cliquez sur **Coller le jeton** (ou appuyez sur **Ctrl+V** dans la fenêtre, ou passez par le menu de l'icône). Le jeton est rangé dans le **Gestionnaire d'identifiants Windows**, sous l'identifiant « ForeverPulse/Companion », puis le presse-papiers est vidé.
-
-Un jeton perdu ne se retrouve pas : créez-en un autre et révoquez l'ancien sur la même page. Un jeton révoqué est refusé dès l'envoi suivant et la pastille passe au rouge.
+Cliquez sur **Connecter à Forever Pulse**. Le compagnon affiche un code de 8 caractères (en grand dans la fenêtre,
+dans une notification et dans le menu de l'icône) et ouvre la page du site. Vérifiez que la page montre **le même
+code**, cochez la confirmation puis **Connecter cette installation**. L'autorisation est rangée dans le
+**Gestionnaire d'identifiants Windows** (« ForeverPulse/Companion ») ; aucun jeton n'est à copier. Depuis la 0.10.0,
+le bouton **Coller le jeton** n'existe plus : le site ne délivre plus de jeton manuel.
 
 ## Au quotidien
 
@@ -250,7 +247,7 @@ Dans la fenêtre, cliquez sur **Désinstaller…** (en bas à gauche), puis sur 
 3. le dossier `%APPDATA%\ForeverPulse\Companion\` (réglages, base, journal) ;
 4. l'exécutable lui-même, deux secondes après s'être fermé.
 
-Les lots pas encore envoyés sont perdus. Il reste à **révoquer le jeton** sur la page des jetons du site : le compagnon ne peut pas le faire à votre place. Rien n'est jamais touché dans le dossier du jeu.
+Les lots pas encore envoyés sont perdus. Il reste à **révoquer cette installation** depuis votre compte sur le site (`https://forever-pulse.com/account`, panneau Companion) : le compagnon ne peut pas le faire à votre place. Rien n'est jamais touché dans le dossier du jeu.
 
 ## Ligne de commande (tests)
 

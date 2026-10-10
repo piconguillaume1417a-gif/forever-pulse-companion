@@ -13,7 +13,7 @@ const Largeur = 440
 // Identifiants des zones cliquables. Les commandes gardent les valeurs de la 0.5.0.
 const (
 	Envoyer = 201 + iota
-	Coller
+	_ // ancien « Coller le jeton » (retiré en 0.10.0) ; gardé pour la numérotation
 	Journal
 	Page
 	Demarrage
@@ -27,6 +27,7 @@ const (
 	Autres  // ligne « + N autres périmètres » (infobulle seule)
 	Details // 0.7.0 : ligne « Dernier envoi » : détail de l'état (infobulle seule)
 	PrixDetails
+	Installations // 0.10.0 : « Gérer les installations » (page du compte)
 )
 
 // Genre d'opération de dessin.
@@ -108,6 +109,29 @@ type Modele struct {
 	Details                                      []string
 	AuctionSent, AuctionPending, AuctionUnproven int
 	Auctions                                     bool
+
+	// Code de comparaison d'une association en cours, affiché en grand à côté
+	// de Connection : le même que celui de la page du site.
+	ConnectionCode string
+}
+
+// Connexion : la ligne d'association de la fenêtre et son code de comparaison.
+// codeEtat est le Code de l'état du moteur. Un jeton absent ou refusé (« token »)
+// ne masque jamais une association en cours : sur une installation neuve, le
+// premier envoi sans jeton pose ce blocage, et le code doit pourtant rester lisible.
+func Connexion(codeEtat, state, detail string) (texte, code string) {
+	if codeEtat == "token" && (state == "" || state == "connected") {
+		state, detail = "revoked", ""
+	}
+	switch state {
+	case "":
+		return "", ""
+	case "pending":
+		if detail != "" {
+			return i18n.T("connect.compare"), detail
+		}
+	}
+	return i18n.T("connect."+state, detail), ""
 }
 
 // Interaction : survol, appui, focus clavier, commandes en cours.
@@ -182,7 +206,6 @@ func mesures(nPortees int) (yCumul, hCumul, total int) {
 // Glyphes (Segoe MDL2 Assets, présente depuis Windows 10).
 const (
 	GlypheEnvoyer = ""
-	GlypheColler  = ""
 	GlypheLien    = ""
 	GlypheJournal = ""
 	GlypheHorloge = ""
@@ -329,8 +352,19 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 
 	// Actions : l'action utile en premier, en couleur.
 	if m.Connection != "" {
-		texte(Rect{24, yCumul - 42, W - 48, 36}, m.Connection, 12, false, th.Texte, Gauche)
-		zones = append(zones, Zone{ID: 990, R: Rect{24, yCumul - 42, W - 48, 36}, Bulle: m.Connection, Info: true})
+		largeurTexte := W - 48
+		if m.ConnectionCode != "" {
+			// Le code, en grand et à droite : c'est lui que l'on compare avec la page.
+			largeurTexte = W - 48 - 160
+			add(Op{Genre: OpRect, R: Rect{W - 24 - 150, yCumul - 42, 150, 34}, Rayon: 8, Couleur: th.Carte, Bord: th.Accent, Epais: 1})
+			texte(Rect{W - 24 - 150, yCumul - 42, 150, 34}, m.ConnectionCode, 20, true, th.Accent, Centre)
+		}
+		add(Op{Genre: OpTexte, R: Rect{24, yCumul - 42, largeurTexte, 36}, Texte: m.Connection, Taille: 12, Couleur: th.Texte, Lignes: true})
+		bulle := m.Connection
+		if m.ConnectionCode != "" {
+			bulle = i18n.T("connect.pending", m.ConnectionCode)
+		}
+		zones = append(zones, Zone{ID: 990, R: Rect{24, yCumul - 42, W - 48, 36}, Bulle: bulle, Info: true})
 	}
 	yb := yCumul + hCumul + 14
 	premier, second := Envoyer, Page
@@ -384,7 +418,7 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 	bouton(premier, Rect{16, yb, bw, 40}, true, gl[premier], cles[premier], bulles[premier])
 	bouton(second, Rect{16 + bw + 8, yb, bw, 40}, false, gl[second], cles[second], bulles[second])
 	yb += 48
-	bouton(Coller, Rect{16, yb, bw, 34}, false, GlypheColler, "btn.paste", "tip.paste")
+	bouton(Installations, Rect{16, yb, bw, 34}, false, GlypheLien, "btn.installations", "tip.installations")
 	bouton(Journal, Rect{16 + bw + 8, yb, bw, 34}, false, GlypheJournal, "btn.log", "tip.log")
 	yb += 34 + 14
 

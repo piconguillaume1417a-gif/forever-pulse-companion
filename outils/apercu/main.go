@@ -35,8 +35,9 @@ func main() {
 		inter vue.Interaction
 	}{
 		{"00-connection-pending-fr", i18n.FR, vue.Clair(), func(m vue.Modele) vue.Modele {
-			m.Code, m.Message, m.Couleur = "notoken", "Companion déconnecté", 2
-			m.Connection = i18n.T("connect.pending", "ABCD1234")
+			// Installation neuve : association en cours, code affiché en grand.
+			m.Code, m.Message, m.Couleur = "notoken", "Companion non connecté", 2
+			m.Connection, m.ConnectionCode = vue.Connexion("notoken", "pending", "0E26CF55")
 			return m
 		}, vue.Interaction{}},
 		{"00-connection-connected-en", i18n.EN, vue.Sombre(), func(m vue.Modele) vue.Modele {
@@ -57,7 +58,7 @@ func main() {
 			m.Couleur, m.Code, m.Message, m.Attente, m.Envoyes, m.DernierEnvoi = 2, "notoken", "Companion déconnecté", 546, 0, ""
 			m.Demarrage = false
 			return m
-		}, vue.Interaction{FocusVisible: true, Focus: vue.Coller}},
+		}, vue.Interaction{FocusVisible: true, Focus: vue.Installations}},
 		{"04-demarrage-sombre-en", i18n.EN, vue.Sombre(), func(m vue.Modele) vue.Modele {
 			m.Pret, m.Portees, m.DernierEnvoi = false, nil, ""
 			return m
