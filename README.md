@@ -19,6 +19,14 @@ It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
 
 Build: `go build -trimpath -ldflags "-H windowsgui -s -w" -o ForeverPulseCompanion.exe ./cmd/forever-pulse-companion` (Go 1.24).
 
+## Lighter local database (0.10.0)
+
+The content of a census batch **sent more than 3 days ago** is erased from `companion.db`, two minutes after start-up
+and then once a day, in small slices. The batch identifier (a sent batch is never sent again) and its counters
+(characters, bytes, dates) are kept; pending or rejected batches, statistics sheets and the character tally are not
+touched. The first purge compacts the database once (it can take a few tens of seconds on a large database); later
+only the freed space is returned to the disk.
+
 ## Browser connection candidate — 0.9.0-rc.1
 
 Click **Connect to Forever Pulse**, sign in or create an account in your browser,

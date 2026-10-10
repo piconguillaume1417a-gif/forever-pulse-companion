@@ -318,6 +318,48 @@ func (s *Store) Counts() map[string]int {
 	return out
 }
 
+// Purge des lots envoyés (0.10.0) ----------------------------------------------
+//
+// Le contenu d'un lot envoyé n'est jamais relu : seuls son identifiant (un lot
+// déjà connu n'est pas remis en file, voir AddFile) et ses compteurs (état,
+// personnages, octets, dates) servent. Les fiches de statistiques ne sont pas
+// concernées : leur contenu sert à les renvoyer (StatsRequeueTalents).
+
+// PurgeLotsEnvoyes vide le contenu d'au plus max lots envoyés avant avant
+// (secondes Unix). La ligne reste : identifiant et compteurs sont gardés. Les
+// lots en attente ou refusés ne sont jamais touchés.
+func (s *Store) PurgeLotsEnvoyes(avant int64, max int) (int, error) {
+	r, err := s.db.Exec(`update queue set payload='' where batch_id in (select batch_id from queue
+		where state='sent' and payload<>'' and coalesce(sent_at, queued_at) < ? limit ?)`, avant, max)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := r.RowsAffected()
+	return int(n), nil
+}
+
+// Compacte rend au disque la place libérée. La première fois, la base passe en
+// auto_vacuum incrémental, ce qui demande un VACUUM complet (une seule fois) ;
+// ensuite seules les pages libres sont rendues, sans réécrire la base.
+func (s *Store) Compacte() error {
+	var mode int
+	if err := s.db.QueryRow(`pragma auto_vacuum`).Scan(&mode); err != nil {
+		return err
+	}
+	if mode != 2 {
+		if _, err := s.db.Exec(`pragma auto_vacuum=incremental`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`vacuum`); err != nil {
+			return err
+		}
+	} else if _, err := s.db.Exec(`pragma incremental_vacuum`); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(`pragma wal_checkpoint(truncate)`)
+	return err
+}
+
 // Statistiques de personnages ---------------------------------------------------
 
 // StatsFileKnown : les statistiques de ce fichier ont déjà été mises en file.

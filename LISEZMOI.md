@@ -1,5 +1,13 @@
 # Forever Pulse Companion
 
+## Base locale allégée (0.10.0)
+
+Le contenu d'un lot de recensement **envoyé depuis plus de 3 jours** est effacé de `companion.db`, deux minutes
+après le démarrage puis une fois par jour, par petites tranches. L'identifiant du lot (un lot déjà envoyé n'est jamais
+renvoyé) et ses compteurs (personnages, octets, dates) sont gardés ; les lots en attente ou refusés, les fiches de
+statistiques et le cumul des personnages ne sont pas touchés. La première purge compacte la base une fois (elle peut
+prendre quelques dizaines de secondes sur une grosse base) ; ensuite seule la place libérée est rendue au disque.
+
 ## Connexion par navigateur — candidat 0.9.0-rc.1
 
 Cliquez sur **Connecter à Forever Pulse**, connectez-vous ou créez votre compte

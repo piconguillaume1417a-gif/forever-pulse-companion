@@ -665,6 +665,44 @@ func TestResumeSQLIdentiqueAuCumulComplet(t *testing.T) {
 	compare("lots déjà connus", a2)
 }
 
+// Purge (0.10.0) : le contenu d'un lot envoyé reste 3 jours, puis il est effacé ;
+// les compteurs de la fenêtre ne bougent pas et un lot en attente n'est jamais touché.
+func TestPurgeLotsApresTroisJours(t *testing.T) {
+	b := nouveauBanc(t)
+	ctx := context.Background()
+	if _, err := b.a.ProcessFile(ctx, b.fichier("ForeverPulse.lua", fixture(3, 50, 1))); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.a.Flush(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.a.ProcessFile(ctx, b.fichier("ForeverPulse2.lua", fixture(2, 50, 2))); err != nil {
+		t.Fatal(err)
+	}
+	avant := b.a.Etat()
+	if avant.Sent != 3 || avant.Pending != 2 {
+		t.Fatalf("départ : %+v", avant)
+	}
+	// sent_at est l'horloge réelle : « maintenant » d'abord, puis 3 jours et 1 heure plus tard.
+	b.now = time.Now()
+	if n, err := b.a.PurgeLots(ctx); err != nil || n != 0 {
+		t.Fatalf("purge avant 3 jours : %d %v", n, err)
+	}
+	b.now = time.Now().Add(DelaiPurge + time.Hour)
+	if n, err := b.a.PurgeLots(ctx); err != nil || n != 3 {
+		t.Fatalf("purge après 3 jours : %d %v", n, err)
+	}
+	if apres := b.a.Etat(); apres.Sent != avant.Sent || apres.Pending != avant.Pending || apres.Rejected != avant.Rejected {
+		t.Fatalf("compteurs changés : %+v → %+v", avant, apres)
+	}
+	if err := b.a.Flush(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if e := b.a.Etat(); e.Sent != 5 || e.Pending != 0 {
+		t.Fatalf("les lots en attente doivent partir intacts : %+v", e)
+	}
+}
+
 // Installation neuve : le premier envoi sans jeton pose le blocage « jeton », mais
 // la fenêtre dit « non connecté » et non « refusé ou révoqué ».
 func TestInstallationNeuveSansJetonNEstPasUnRefus(t *testing.T) {
