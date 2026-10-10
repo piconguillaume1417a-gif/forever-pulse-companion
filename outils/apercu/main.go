@@ -35,8 +35,9 @@ func main() {
 		inter vue.Interaction
 	}{
 		{"00-connection-pending-fr", i18n.FR, vue.Clair(), func(m vue.Modele) vue.Modele {
-			m.Code, m.Message, m.Couleur = "notoken", "Companion déconnecté", 2
-			m.Connection = i18n.T("connect.pending", "ABCD1234")
+			// Installation neuve : le premier envoi sans jeton a posé le blocage « token ».
+			m.Code, m.Message, m.Couleur = "token", "Companion déconnecté", 2
+			m.Connection, m.ConnectionCode = vue.Connexion("token", "pending", "0E26CF55")
 			return m
 		}, vue.Interaction{}},
 		{"00-connection-connected-en", i18n.EN, vue.Sombre(), func(m vue.Modele) vue.Modele {

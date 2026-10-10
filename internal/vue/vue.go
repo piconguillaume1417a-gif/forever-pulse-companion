@@ -108,6 +108,21 @@ type Modele struct {
 	Details                                      []string
 	AuctionSent, AuctionPending, AuctionUnproven int
 	Auctions                                     bool
+
+	// Code de comparaison d'une association en cours, affiché en grand à côté
+	// de Connection : le même que celui de la page du site.
+	ConnectionCode string
+}
+
+// Connexion : la ligne d'association de la fenêtre et son code de comparaison.
+func Connexion(codeEtat, state, detail string) (texte, code string) {
+	if codeEtat == "token" {
+		state, detail = "revoked", ""
+	}
+	if state == "" {
+		return "", ""
+	}
+	return i18n.T("connect."+state, detail), ""
 }
 
 // Interaction : survol, appui, focus clavier, commandes en cours.
@@ -329,8 +344,19 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 
 	// Actions : l'action utile en premier, en couleur.
 	if m.Connection != "" {
-		texte(Rect{24, yCumul - 42, W - 48, 36}, m.Connection, 12, false, th.Texte, Gauche)
-		zones = append(zones, Zone{ID: 990, R: Rect{24, yCumul - 42, W - 48, 36}, Bulle: m.Connection, Info: true})
+		largeurTexte := W - 48
+		if m.ConnectionCode != "" {
+			// Le code, en grand et à droite : c'est lui que l'on compare avec la page.
+			largeurTexte = W - 48 - 160
+			add(Op{Genre: OpRect, R: Rect{W - 24 - 150, yCumul - 42, 150, 34}, Rayon: 8, Couleur: th.Carte, Bord: th.Accent, Epais: 1})
+			texte(Rect{W - 24 - 150, yCumul - 42, 150, 34}, m.ConnectionCode, 20, true, th.Accent, Centre)
+		}
+		add(Op{Genre: OpTexte, R: Rect{24, yCumul - 42, largeurTexte, 36}, Texte: m.Connection, Taille: 12, Couleur: th.Texte, Lignes: true})
+		bulle := m.Connection
+		if m.ConnectionCode != "" {
+			bulle = i18n.T("connect.pending", m.ConnectionCode)
+		}
+		zones = append(zones, Zone{ID: 990, R: Rect{24, yCumul - 42, W - 48, 36}, Bulle: bulle, Info: true})
 	}
 	yb := yCumul + hCumul + 14
 	premier, second := Envoyer, Page

@@ -117,13 +117,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		connectionMu.Lock()
 		state, detail := connectionState, connectionDetail
 		connectionMu.Unlock()
-		if e.Code == "token" {
-			state, detail = "revoked", ""
-		}
-		connectionText := ""
-		if state != "" {
-			connectionText = i18n.T("connect."+state, detail)
-		}
+		connectionText, connectionCode := vue.Connexion(e.Code, state, detail)
 		etatMu.Lock()
 		etat = e.Message
 		etatMu.Unlock()
@@ -131,7 +125,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		m := vue.Modele{Pret: true, Couleur: int(e.Couleur), Code: e.Code, Message: e.Message,
 			Envoyes: e.Sent, Attente: e.Pending, Refuses: e.Rejected, DernierEnvoi: e.DernierEnvoi, Version: app.Version,
 			Details: e.Details, Auctions: true, AuctionSent: e.AuctionSent, AuctionPending: e.AuctionPending, AuctionUnproven: e.AuctionUnproven}
-		m.Connection = connectionText
+		m.Connection, m.ConnectionCode = connectionText, connectionCode
 		for _, p := range e.Portees {
 			m.Portees = append(m.Portees, vue.Portee{Nom: p.ScopeID, Total: p.Total, Depuis: p.Depuis})
 		}
@@ -159,9 +153,19 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 	connector := &connect.Client{Site: cfg.SiteURL, Vault: vault, SaveToken: a.SetToken, Open: winui.Open,
 		Status: func(state, detail string) {
 			connectionMu.Lock()
+			previous, previousDetail := connectionState, connectionDetail
 			connectionState, connectionDetail = state, detail
 			connectionMu.Unlock()
+			if state != previous {
+				log.Printf("association : %s", state) // jamais le détail (adresse du compte)
+			}
 			refresh()
+			if state == "pending" && detail != "" && (previous != "pending" || previousDetail != detail) {
+				// Le code doit être visible même quand l'association part du menu de
+				// l'icône, fenêtre fermée : on l'ouvre et on le notifie.
+				w.PostShow()
+				t.Notify(winui.AppName, i18n.T("connect.pending", detail), false)
+			}
 			if state == "connected" {
 				select {
 				case reveil <- struct{}{}:
@@ -343,7 +347,13 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		majMu.Lock()
 		v := majPrete
 		majMu.Unlock()
-		items := []winui.Item{{Label: msg}, {Separator: true}}
+		items := []winui.Item{{Label: msg}}
+		connectionMu.Lock()
+		if connectionState == "pending" && connectionDetail != "" {
+			items = append(items, winui.Item{Label: i18n.T("connect.pending", connectionDetail)})
+		}
+		connectionMu.Unlock()
+		items = append(items, winui.Item{Separator: true})
 		if v != "" {
 			items = append(items, winui.Item{Label: i18n.T("menu.update", v), Action: redemarrer}, winui.Item{Separator: true})
 		}

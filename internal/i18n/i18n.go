@@ -80,6 +80,7 @@ var msgs = map[string][2]string{
 	"tip.connect":         {"Ouvre le navigateur pour associer ce PC à votre compte. Aucun jeton à copier.", "Open your browser to connect this PC to your account. No token to copy."},
 	"btn.installations":   {"Gérer les installations", "Manage installations"},
 	"connect.pending":     {"En attente de confirmation — code %s", "Waiting for confirmation — code %s"},
+	"connect.compare":     {"En attente de confirmation sur le site. Vérifiez que la page affiche ce code :", "Waiting for confirmation on the website. Check that the page shows this code:"},
 	"connect.connected":   {"Connecté : %s", "Connected: %s"},
 	"connect.cancelled":   {"Connexion annulée%s", "Connection cancelled%s"},
 	"connect.expired":     {"Demande expirée : reconnectez-vous%s", "Request expired: connect again%s"},
