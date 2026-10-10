@@ -700,6 +700,8 @@ func TestPurgeLotsApresTroisJours(t *testing.T) {
 	}
 	if e := b.a.Etat(); e.Sent != 5 || e.Pending != 0 {
 		t.Fatalf("les lots en attente doivent partir intacts : %+v", e)
+	}
+}
 
 // Installation neuve : le premier envoi sans jeton pose le blocage « jeton », mais
 // la fenêtre dit « non connecté » et non « refusé ou révoqué ».
