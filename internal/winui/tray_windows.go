@@ -44,18 +44,12 @@ var (
 	pGetCursorPos       = user32.NewProc("GetCursorPos")
 	pSetForegroundWin   = user32.NewProc("SetForegroundWindow")
 	pCreateIconIndir    = user32.NewProc("CreateIconIndirect")
-	pOpenClipboard      = user32.NewProc("OpenClipboard")
-	pCloseClipboard     = user32.NewProc("CloseClipboard")
-	pGetClipboardData   = user32.NewProc("GetClipboardData")
-	pEmptyClipboard     = user32.NewProc("EmptyClipboard")
 	pGetSystemMetrics   = user32.NewProc("GetSystemMetrics")
 	pShellNotifyIcon    = shell32.NewProc("Shell_NotifyIconW")
 	pShellExecute       = shell32.NewProc("ShellExecuteW")
 	pCreateDIBSection   = gdi32.NewProc("CreateDIBSection")
 	pCreateBitmap       = gdi32.NewProc("CreateBitmap")
 	pDeleteObject       = gdi32.NewProc("DeleteObject")
-	pGlobalLock         = kernel32.NewProc("GlobalLock")
-	pGlobalUnlock       = kernel32.NewProc("GlobalUnlock")
 	pCreateMutex        = kernel32.NewProc("CreateMutexW")
 	pGetModuleHandle    = kernel32.NewProc("GetModuleHandleW")
 	pFindWindow         = user32.NewProc("FindWindowW")
@@ -103,7 +97,6 @@ const (
 	tpmRightButton = 0x0002
 	tpmBottomAlign = 0x0020
 
-	cfUnicodeText    = 13
 	smCxSmIcon       = 49
 	smCxIcon         = 11
 	wsExToolWindow   = 0x00000080
@@ -495,28 +488,6 @@ func iconFromImage(img *image.NRGBA) uintptr {
 	pDeleteObject.Call(color)
 	pDeleteObject.Call(mask)
 	return h
-}
-
-// ReadClipboard lit le texte du presse-papiers. clear : le vider ensuite.
-func (t *Tray) ReadClipboard(clearIf func(string) bool) (string, error) {
-	if r, _, err := pOpenClipboard.Call(t.hwnd); r == 0 {
-		return "", err
-	}
-	defer pCloseClipboard.Call()
-	h, _, err := pGetClipboardData.Call(cfUnicodeText)
-	if h == 0 {
-		return "", err
-	}
-	p, _, err := pGlobalLock.Call(h)
-	if p == 0 {
-		return "", err
-	}
-	s := windows.UTF16PtrToString((*uint16)(*(*unsafe.Pointer)(unsafe.Pointer(&p))))
-	pGlobalUnlock.Call(h)
-	if clearIf != nil && clearIf(s) {
-		pEmptyClipboard.Call()
-	}
-	return s, nil
 }
 
 // Open ouvre un fichier ou une adresse avec l'application par défaut.

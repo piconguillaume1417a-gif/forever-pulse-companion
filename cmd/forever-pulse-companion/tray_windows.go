@@ -88,7 +88,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 	// est réécrite à chaque démarrage pour suivre l'exécutable s'il a été déplacé.
 	_ = winui.StartWithWindows(cfg.StartWithWindows)
 
-	companionURL := strings.TrimRight(cfg.SiteURL, "/") + "/account/companion"
+	companionURL := config.PageCompte(cfg.SiteURL)
 	ctx, cancel := context.WithCancel(context.Background())
 	var fin sync.Once
 	t := &winui.Tray{}
@@ -214,34 +214,6 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			t.Notify(winui.AppName, i18n.T("notify.sent"), false)
 		}
 	}
-	collerJeton := func() {
-		// Serialize fallback replacement with automatic delivery and clear stale identity.
-		stopMu.Lock()
-		if stopConnect != nil {
-			stopConnect()
-		}
-		stopMu.Unlock()
-		connectMu.Lock()
-		defer connectMu.Unlock()
-		var ok bool
-		txt, err := t.ReadClipboard(func(s string) bool { _, ok = secret.Normalise(s); return ok })
-		if err != nil || !ok {
-			w.Info(i18n.T("paste.none"))
-			return
-		}
-		tok, _ := secret.Normalise(txt)
-		if err := a.SetToken(tok); err != nil {
-			w.Info(i18n.T("paste.fail", err))
-			return
-		}
-		_ = vault.DeleteConnection()
-		connectionMu.Lock()
-		connectionState, connectionDetail = "", ""
-		connectionMu.Unlock()
-		refresh()
-		t.Notify(winui.AppName, i18n.T("paste.ok"), false)
-		go func() { _ = a.Flush(ctx, true) }()
-	}
 	demarrage := func(on bool) {
 		if err := winui.StartWithWindows(on); err != nil {
 			w.SetChecked(!on)
@@ -363,7 +335,6 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			{Label: i18n.T("btn.connect"), Action: func() { connecter(false) }},
 			{Label: i18n.T("connect.cancel"), Action: annulerConnexion},
 			{Label: i18n.T("btn.installations"), Action: func() { winui.Open(companionURL) }},
-			{Label: i18n.T("btn.paste"), Action: collerJeton},
 			{Label: i18n.T("btn.log"), Action: func() { winui.Open(log.Path()) }},
 			{Label: i18n.T("win.autostart"), Checked: winui.StartsWithWindows(), Action: func() {
 				on := !winui.StartsWithWindows()
@@ -380,8 +351,8 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		switch id {
 		case winui.CmdEnvoyer:
 			envoyer()
-		case winui.CmdColler:
-			collerJeton()
+		case winui.CmdInstallations:
+			winui.Open(companionURL)
 		case winui.CmdJournal:
 			winui.Open(log.Path())
 		case winui.CmdPage:

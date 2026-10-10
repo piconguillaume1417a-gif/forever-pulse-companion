@@ -68,7 +68,7 @@ func TestMiseEnPage(t *testing.T) {
 						}
 					}
 				}
-				for _, id := range []int{Envoyer, Coller, Journal, Page, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
+				for _, id := range []int{Envoyer, Installations, Journal, Page, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
 					if !vus[id] {
 						t.Errorf("commande %d absente", id)
 					}

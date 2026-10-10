@@ -126,3 +126,11 @@ func TestSiteForeverPulseCom(t *testing.T) {
 		t.Fatal("AncienDomaine")
 	}
 }
+
+func TestPageCompteMeneAuPanneauDesInstallations(t *testing.T) {
+	for _, site := range []string{SiteDefaut, SiteDefaut + "/"} {
+		if got := PageCompte(site); got != "https://forever-pulse.com/account" {
+			t.Fatalf("%q : %q", site, got)
+		}
+	}
+}

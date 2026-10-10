@@ -58,7 +58,7 @@ func main() {
 			m.Couleur, m.Code, m.Message, m.Attente, m.Envoyes, m.DernierEnvoi = 2, "notoken", "Companion déconnecté", 546, 0, ""
 			m.Demarrage = false
 			return m
-		}, vue.Interaction{FocusVisible: true, Focus: vue.Coller}},
+		}, vue.Interaction{FocusVisible: true, Focus: vue.Installations}},
 		{"04-demarrage-sombre-en", i18n.EN, vue.Sombre(), func(m vue.Modele) vue.Modele {
 			m.Pret, m.Portees, m.DernierEnvoi = false, nil, ""
 			return m

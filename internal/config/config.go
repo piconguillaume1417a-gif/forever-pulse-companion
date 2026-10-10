@@ -284,3 +284,10 @@ auto_update = %t
 	}
 	return os.Rename(tmp, path)
 }
+
+// PageCompte : la page du compte sur le site, où le panneau Companion liste les
+// installations reliées et permet de les révoquer. /account/companion n'y mène
+// plus (redirigée vers /data-sources/contribute depuis la PR #198 du site).
+func PageCompte(site string) string {
+	return strings.TrimRight(site, "/") + "/account"
+}

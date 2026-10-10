@@ -13,7 +13,7 @@ const Largeur = 440
 // Identifiants des zones cliquables. Les commandes gardent les valeurs de la 0.5.0.
 const (
 	Envoyer = 201 + iota
-	Coller
+	_ // ancien « Coller le jeton » (retiré en 0.10.0) ; gardé pour la numérotation
 	Journal
 	Page
 	Demarrage
@@ -27,6 +27,7 @@ const (
 	Autres  // ligne « + N autres périmètres » (infobulle seule)
 	Details // 0.7.0 : ligne « Dernier envoi » : détail de l'état (infobulle seule)
 	PrixDetails
+	Installations // 0.10.0 : « Gérer les installations » (page du compte)
 )
 
 // Genre d'opération de dessin.
@@ -205,7 +206,6 @@ func mesures(nPortees int) (yCumul, hCumul, total int) {
 // Glyphes (Segoe MDL2 Assets, présente depuis Windows 10).
 const (
 	GlypheEnvoyer = ""
-	GlypheColler  = ""
 	GlypheLien    = ""
 	GlypheJournal = ""
 	GlypheHorloge = ""
@@ -418,7 +418,7 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 	bouton(premier, Rect{16, yb, bw, 40}, true, gl[premier], cles[premier], bulles[premier])
 	bouton(second, Rect{16 + bw + 8, yb, bw, 40}, false, gl[second], cles[second], bulles[second])
 	yb += 48
-	bouton(Coller, Rect{16, yb, bw, 34}, false, GlypheColler, "btn.paste", "tip.paste")
+	bouton(Installations, Rect{16, yb, bw, 34}, false, GlypheLien, "btn.installations", "tip.installations")
 	bouton(Journal, Rect{16 + bw + 8, yb, bw, 34}, false, GlypheJournal, "btn.log", "tip.log")
 	yb += 34 + 14
 
