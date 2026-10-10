@@ -115,12 +115,20 @@ type Modele struct {
 }
 
 // Connexion : la ligne d'association de la fenêtre et son code de comparaison.
+// codeEtat est le Code de l'état du moteur. Un jeton absent ou refusé (« token »)
+// ne masque jamais une association en cours : sur une installation neuve, le
+// premier envoi sans jeton pose ce blocage, et le code doit pourtant rester lisible.
 func Connexion(codeEtat, state, detail string) (texte, code string) {
-	if codeEtat == "token" {
+	if codeEtat == "token" && (state == "" || state == "connected") {
 		state, detail = "revoked", ""
 	}
-	if state == "" {
+	switch state {
+	case "":
 		return "", ""
+	case "pending":
+		if detail != "" {
+			return i18n.T("connect.compare"), detail
+		}
 	}
 	return i18n.T("connect."+state, detail), ""
 }
