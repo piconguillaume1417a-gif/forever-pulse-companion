@@ -120,20 +120,20 @@ The window, the icon menu and the notifications are available in **French and En
 
 ## The window (0.6.0)
 
-The window follows the Windows light or dark theme and opens next to the clock. It shows a status card (green, orange or red, with what to do next), three counters (batches sent, pending, rejected), the last upload, the distinct characters observed per scope, and the actions: **Send now**, **Connect to Forever Pulse** (highlighted when disconnected), advanced **Paste token**, **Open log**, a **Start with Windows** switch, **FR / EN**, and at the bottom the rare actions (**Clear data…**, **Uninstall…**) plus **Minimize** and **Quit**. Every button has a tooltip. Keyboard: Tab / Shift+Tab or arrows to move, Enter or Space to activate, Ctrl+V to paste the token, Esc to close.
+The window follows the Windows light or dark theme and opens next to the clock. It shows a status card (green, orange or red, with what to do next), three counters (batches sent, pending, rejected), the last upload, the distinct characters observed per scope, and the actions: **Send now**, **Connect to Forever Pulse** (highlighted when disconnected), **Manage installations** (your account on the website), **Open log**, a **Start with Windows** switch, **FR / EN**, and at the bottom the rare actions (**Clear data…**, **Uninstall…**) plus **Minimize** and **Quit**. Every button has a tooltip. Keyboard: Tab / Shift+Tab or arrows to move, Enter or Space to activate, Esc to close.
 
 The window only exists while it is open: closing it frees everything it uses, and when started with Windows the companion does not create it until the icon is clicked. The watch loop wakes up every 5 minutes (`poll_seconds` in `config.toml`, 1 to 3600) and only checks the file size and date and whether batches are waiting; a file that just changed is re-checked 3 seconds later, then processed, and **Send now** wakes the loop immediately; memory used to decode a large file and read the tally back is handed back to Windows as soon as it is processed; at rest the companion uses about 40 MB (0.7.4).
 
 ## Everyday use
 
 - **Left click** on the icon next to the clock: opens the window.
-- **Right click**: menu with the current status, **Open Forever Pulse Companion** (bold, same as left click), **Send now**, **Paste token**, **Open log**, **Start with Windows** and **Quit**.
+- **Right click**: menu with the current status, **Open Forever Pulse Companion** (bold, same as left click), **Send now**, **Connect to Forever Pulse**, **Cancel connection**, **Manage installations**, **Open log**, **Start with Windows** and **Quit**.
 - **Minimize**, the title bar “—” button or the close button: the window goes straight to the notification area, with no notification and no taskbar button. The companion keeps running.
 - **Start with Windows**: checked by default, can be unchecked (per-user `HKCU\...\Run` entry, no administrator rights).
-- **Connect to Forever Pulse**: opens the browser for account approval; no token copy. **Cancel connection** and **Manage installations** are available in the tray menu.
-- **Paste token** (advanced fallback): create a token on the website's token page (`https://forever-pulse.com/account/companion`), copy it, then click this button. The token is stored in Windows Credential Manager and the clipboard is cleared.
+- **Connect to Forever Pulse**: shows an 8-character code (large in the window, in a notification and in the tray menu) and opens the website page; check that the page shows the same code, then approve. No token copy. The **Paste token** button was removed in 0.10.0: the website no longer issues manual tokens.
+- **Manage installations**: opens your account (`https://forever-pulse.com/account`, Companion panel) to see and revoke installations.
 - **Clear local data…**: empties the upload queue, the tally of observed characters and the list of files already read. The token and settings are kept.
-- **Uninstall…**: removes the start with Windows entry, the stored token, `%APPDATA%\ForeverPulse\Companion\` and the program itself. Then revoke the token on the website.
+- **Uninstall…**: removes the start with Windows entry, the stored token, `%APPDATA%\ForeverPulse\Companion\` and the program itself. Then revoke this installation from your account on the website.
 
 ## What is sent
 

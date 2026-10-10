@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -662,4 +663,26 @@ func TestResumeSQLIdentiqueAuCumulComplet(t *testing.T) {
 		t.Fatal("lots déjà connus remis en file")
 	}
 	compare("lots déjà connus", a2)
+}
+
+// Installation neuve : le premier envoi sans jeton pose le blocage « jeton », mais
+// la fenêtre dit « non connecté » et non « refusé ou révoqué ».
+func TestInstallationNeuveSansJetonNEstPasUnRefus(t *testing.T) {
+	b := nouveauBanc(t)
+	ctx := context.Background()
+	b.a.Token = func() (string, error) { return "", secret.ErrAbsent }
+	if _, err := b.a.ProcessFile(ctx, b.fichier("ForeverPulse.lua", fixture(2, 10, 7))); err != nil {
+		t.Fatal(err)
+	}
+	_ = b.a.Flush(ctx, false)
+	if b.st.Get("blocked") != BlocJeton {
+		t.Fatal("le premier envoi sans jeton doit poser le blocage jeton")
+	}
+	if e := b.a.Etat(); e.Code != "notoken" || e.Couleur != Rouge {
+		t.Fatalf("installation neuve : %+v", e)
+	}
+	b.a.Token = func() (string, error) { return "", errors.New("coffre illisible") }
+	if e := b.a.Etat(); e.Code != "token" {
+		t.Fatalf("jeton illisible : %+v", e)
+	}
 }

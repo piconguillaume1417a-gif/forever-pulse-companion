@@ -799,6 +799,11 @@ func (a *App) Etat() Etat {
 		e.Couleur, e.Code, e.Message = Rouge, "schema", i18n.T("st.schema")
 	case BlocJeton:
 		e.Couleur, e.Code, e.Message = Rouge, "token", i18n.T("st.token")
+		// Installation neuve : aucun jeton n'a jamais été enregistré. Ce n'est pas
+		// un refus, l'action utile est la même que sans blocage (« Connecter »).
+		if _, err := a.Token(); errors.Is(err, secret.ErrAbsent) {
+			e.Code, e.Message = "notoken", i18n.T("st.notoken")
+		}
 	case BlocSource:
 		e.Couleur, e.Code, e.Message = Rouge, "source", i18n.T("st.source")
 	case BlocCorps:

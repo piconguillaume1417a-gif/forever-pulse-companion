@@ -24,6 +24,7 @@ func modeles() []Modele {
 	out = append(out, Modele{Pret: true, Code: "pending", Message: "Auction prices pending", Auctions: true, AuctionSent: 5000, AuctionPending: 2994, AuctionUnproven: 31, Details: []string{"Synthetic auction error"}, Portees: six})
 	out = append(out, Modele{Pret: true, Code: "notoken", Connection: i18n.T("connect.pending", "ABCD1234"), Version: "0.9.0-rc.1"})
 	out = append(out, Modele{Pret: true, Code: "allsent", Connection: i18n.T("connect.connected", "synthetic@example.invalid"), Version: "0.9.0-rc.1"})
+	out = append(out, Modele{Pret: true, Code: "token", Connection: i18n.T("connect.compare"), ConnectionCode: "ABCD1234", Version: "0.10.0-rc.4"})
 	return out
 }
 
@@ -67,7 +68,7 @@ func TestMiseEnPage(t *testing.T) {
 						}
 					}
 				}
-				for _, id := range []int{Envoyer, Coller, Journal, Page, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
+				for _, id := range []int{Envoyer, Installations, Journal, Page, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
 					if !vus[id] {
 						t.Errorf("commande %d absente", id)
 					}
@@ -106,4 +107,30 @@ func TestMelange(t *testing.T) {
 	if Melange(0x000000, 0xFFFFFF, 0.5) != 0x808080 || Melange(0x123456, 0x654321, 0) != 0x123456 {
 		t.Fatal(Melange(0x000000, 0xFFFFFF, 0.5))
 	}
+}
+
+// Installation neuve : le premier envoi sans jeton pose le blocage « token ».
+// Une association en cours garde pourtant son code à l'écran ; hors association,
+// le blocage s'affiche comme avant.
+func TestConnexionGardeLeCodeMalgreLeBlocageJeton(t *testing.T) {
+	for _, l := range i18n.Toutes {
+		i18n.Set(l)
+		texte, code := Connexion("token", "pending", "ABCD1234")
+		if code != "ABCD1234" || texte != i18n.T("connect.compare") {
+			t.Fatalf("%s : code masqué (%q, %q)", l, texte, code)
+		}
+		if texte, code = Connexion("notoken", "pending", "ABCD1234"); code != "ABCD1234" {
+			t.Fatalf("%s : code absent (%q)", l, texte)
+		}
+		if texte, code = Connexion("token", "", ""); texte != i18n.T("connect.revoked", "") || code != "" {
+			t.Fatalf("%s : blocage hors association (%q)", l, texte)
+		}
+		if texte, code = Connexion("token", "connected", "synthetic@example.invalid"); texte != i18n.T("connect.revoked", "") || code != "" {
+			t.Fatalf("%s : jeton refusé après association (%q)", l, texte)
+		}
+		if texte, code = Connexion("allsent", "network", ""); texte != i18n.T("connect.network", "") || code != "" {
+			t.Fatalf("%s : état réseau (%q)", l, texte)
+		}
+	}
+	i18n.Set(i18n.FR)
 }

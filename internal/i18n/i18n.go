@@ -79,7 +79,9 @@ var msgs = map[string][2]string{
 	"btn.connect":         {"Connecter à Forever Pulse", "Connect to Forever Pulse"},
 	"tip.connect":         {"Ouvre le navigateur pour associer ce PC à votre compte. Aucun jeton à copier.", "Open your browser to connect this PC to your account. No token to copy."},
 	"btn.installations":   {"Gérer les installations", "Manage installations"},
+	"tip.installations":   {"Ouvre votre compte sur le site : installations reliées et révocation.", "Opens your account on the website: connected installations and revocation."},
 	"connect.pending":     {"En attente de confirmation — code %s", "Waiting for confirmation — code %s"},
+	"connect.compare":     {"En attente de confirmation sur le site. Vérifiez que la page affiche ce code :", "Waiting for confirmation on the website. Check that the page shows this code:"},
 	"connect.connected":   {"Connecté : %s", "Connected: %s"},
 	"connect.cancelled":   {"Connexion annulée%s", "Connection cancelled%s"},
 	"connect.expired":     {"Demande expirée : reconnectez-vous%s", "Request expired: connect again%s"},
@@ -94,7 +96,6 @@ var msgs = map[string][2]string{
 	"win.autostart": {"Lancer au démarrage de Windows", "Start with Windows"},
 	"win.language":  {"Langue :", "Language:"},
 	"btn.send":      {"Envoyer maintenant", "Send now"},
-	"btn.paste":     {"Coller le jeton", "Paste token"},
 	"btn.log":       {"Ouvrir le journal", "Open log"},
 	"btn.tokens":    {"Page des jetons (site)", "Token page (website)"},
 	"btn.wipe":      {"Effacer les données locales…", "Clear local data…"},
@@ -123,7 +124,6 @@ var msgs = map[string][2]string{
 	"hint.source":   {"Le site n'accepte pas ces relevés pour l'instant. « Envoyer maintenant » réessaie.", "The website does not accept these readings for now. “Send now” tries again."},
 	"hint.body":     {"Le journal donne le détail des lots refusés. « Envoyer maintenant » reprend les autres.", "The log lists the refused batches. “Send now” resumes the others."},
 	"tip.send":      {"Envoie tout de suite les lots en attente, même après une erreur.", "Uploads pending batches right away, even after an error."},
-	"tip.paste":     {"Enregistre le jeton fpc_… copié depuis le site, puis vide le presse-papiers. Raccourci : Ctrl+V.", "Saves the fpc_… token copied from the website, then clears the clipboard. Shortcut: Ctrl+V."},
 	"tip.tokens":    {"Ouvre la page du site (forever-pulse.com/account/companion) où créer ou révoquer un jeton.", "Opens the website page (forever-pulse.com/account/companion) where tokens are created or revoked."},
 	"tip.log":       {"Ouvre le journal : fichiers lus, envois, erreurs.", "Opens the log: files read, uploads, errors."},
 	"tip.autostart": {"Au démarrage de Windows, le compagnon se lance discrètement, icône seule près de l'horloge.", "When Windows starts, the companion starts quietly, as an icon next to the clock."},
@@ -165,12 +165,6 @@ var msgs = map[string][2]string{
 	"update.rollback": {"La version %s n'a pas démarré correctement : retour à la version précédente", "Version %s did not start correctly: back to the previous version"},
 	"menu.update":     {"Redémarrer pour mettre à jour (%s)", "Restart to update (%s)"},
 
-	// Jeton
-	"paste.none": {"Le presse-papiers ne contient pas de jeton fpc_…\n\nCréez un jeton sur la page des jetons du site, copiez-le, puis recommencez.",
-		"The clipboard does not contain an fpc_… token.\n\nCreate a token on the website's token page, copy it, then try again."},
-	"paste.fail": {"Jeton non enregistré : %s", "Token not saved: %s"},
-	"paste.ok":   {"Jeton enregistré, presse-papiers vidé", "Token saved, clipboard cleared"},
-
 	// Réglages
 	"autostart.fail": {"Réglage impossible : %s", "Could not change the setting: %s"},
 
@@ -185,7 +179,7 @@ var msgs = map[string][2]string{
 		"Uninstall Forever Pulse Companion?\n\nThis removes the start with Windows entry, the token stored in Credential Manager, all local data (%s) and the program itself.\n\nBatches not sent yet will be lost. Remember to revoke the token on the website's token page too."},
 	"uninstall.done":      {"Forever Pulse Companion est désinstallé.", "Forever Pulse Companion has been uninstalled."},
 	"uninstall.check":     {"À vérifier :", "Please check:"},
-	"uninstall.revoke":    {"Révoquez le jeton sur le site : %s", "Revoke the token on the website: %s"},
+	"uninstall.revoke":    {"Révoquez cette installation depuis votre compte : %s", "Revoke this installation from your account: %s"},
 	"uninstall.autostart": {"lancement au démarrage : %s", "start with Windows: %s"},
 	"uninstall.cred":      {"jeton du Gestionnaire d'identifiants : %s", "token in Credential Manager: %s"},
 	"uninstall.dir":       {"dossier %s : %s", "folder %s: %s"},

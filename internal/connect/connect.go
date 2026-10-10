@@ -251,11 +251,13 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 					return errors.New("vault")
 				}
 				started = true
+				// The code is on screen before the browser takes the focus, so the
+				// holder can compare it with the page as soon as the page appears.
+				c.report("pending", out.Code)
 				if open && c.Open != nil {
 					c.Open(expected)
 					open = false
 				}
-				c.report("pending", out.Code)
 			} else if op == "ack" && out.State == "acknowledged" {
 				r.Verifier = ""
 				if e = c.save(r); e != nil {

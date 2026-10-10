@@ -168,3 +168,37 @@ func TestOfflineExpiryAndShutdownRemainDistinct(t *testing.T) {
 		}
 	}
 }
+
+// The pairing code reaches the window before the browser opens, and it is the
+// code the server returned (the one the website page shows).
+func TestPendingCodeShownBeforeBrowserOpens(t *testing.T) {
+	v := &memoryVault{}
+	var events []string
+	serverCode := ""
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		w.Header().Set("Content-Type", "application/json")
+		switch in["operation"] {
+		case "start":
+			serverCode = Code(in["verifier"])
+			_ = json.NewEncoder(w).Encode(Result{State: "pending", Interval: 5, Code: serverCode, Expires: time.Now().Add(14 * time.Minute), URI: server.URL + "/account/companion/connect?request=" + in["request_id"]})
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(Result{Error: "access_denied"})
+		}
+	}))
+	defer server.Close()
+	c := Client{Site: server.URL, Vault: v, SaveToken: func(string) error { return nil },
+		Open:   func(string) { events = append(events, "open") },
+		Status: func(state, detail string) { events = append(events, state+":"+detail) }}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if e := c.Start(ctx); e != nil {
+		t.Fatal(e)
+	}
+	if len(events) < 2 || events[0] != "pending:"+serverCode || events[1] != "open" || serverCode == "" {
+		t.Fatalf("code must be reported before the browser opens, got %v", events)
+	}
+}
