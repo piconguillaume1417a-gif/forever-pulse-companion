@@ -105,7 +105,7 @@ func TestCompacteRendLaPlace(t *testing.T) {
 		ids = append(ids, id)
 		lots = append(lots, QueuedBatch{BatchID: id, ScopeID: "s", Characters: 1, Payload: charge})
 	}
-	if _, err := s.AddFile(ctx, File{SHA256: "f1", Scopes: []byte(`[]`)}, lots, nil); err != nil {
+	if _, err := s.AddFile(ctx, File{SHA256: "f1", Origin: "current", Scopes: []byte(`[]`)}, lots, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.MarkSent(ids); err != nil {
