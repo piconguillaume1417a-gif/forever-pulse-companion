@@ -82,9 +82,11 @@ func TestTalentsPairesVidesNiveauVideEtSources(t *testing.T) {
 		"Player-4619-00000003": ficheTa("1790505847|12|m|1114|0,0,1|3|1|104982:1"),
 		// Paires dans le désordre : triées, la fiche reste valable.
 		"Player-4619-00000004": ficheTa("1790505847|12|n|1114|2,0,0|1|0|104002:1,104001:1"),
+		// Addon 4.3.0 : mes talents, lus dans ma configuration active.
+		"Player-4619-00000005": ficheTa("1790505847|12|s|1114|5,0,0|1|0|104001:5"),
 	}
 	f := decodeA(t, baseTalents(persos))
-	if f.AvecTalents != 4 {
+	if f.AvecTalents != 5 {
 		t.Fatalf("avec talents %d", f.AvecTalents)
 	}
 	if got := talentsJSON(t, f.Fiches[0]); got != `{"read_at":"2026-09-27T10:44:07Z","level":null,"source":"target","tree_id":1114,"points":[],"branch_points":[0,0,0],"dominant":0,"off_grid":0}` {
@@ -98,6 +100,9 @@ func TestTalentsPairesVidesNiveauVideEtSources(t *testing.T) {
 	}
 	if got := talentsJSON(t, f.Fiches[3]); !strings.Contains(got, `"points":[[104001,1,null],[104002,1,null]]`) {
 		t.Fatal(got)
+	}
+	if got := talentsJSON(t, f.Fiches[4]); got != `{"read_at":"2026-09-27T10:44:07Z","level":12,"source":"self","tree_id":1114,"points":[[104001,5,null]],"branch_points":[5,0,0],"dominant":1,"off_grid":0}` {
+		t.Fatalf("mes talents : %s", got)
 	}
 }
 
@@ -114,7 +119,7 @@ func TestTalentsIllisiblesEtHorsBornes(t *testing.T) {
 		"1790505847|30|n|1114|21,0,0|1|0|104001:100", "1790505847|30|n|1114|21,0,0|1|0|104001:5@x",
 	}
 	horsBornes := []any{
-		"1790505847|30|g|1114|21,0,0|1|0|", "1790505847|30||1114|21,0,0|1|0|", "1790505847|30|s|1114|21,0,0|1|0|",
+		"1790505847|30|g|1114|21,0,0|1|0|", "1790505847|30||1114|21,0,0|1|0|",
 		"1790505847|0|n|1114|21,0,0|1|0|", "1790505847|101|n|1114|21,0,0|1|0|", "1790505847|30|n|0|21,0,0|1|0|",
 		"0|30|n|1114|21,0,0|1|0|", fmt.Sprintf("%d|30|n|1114|21,0,0|1|0|", futur),
 		"1790505847|30|n|1114|21,0,0|1|201|", "1790505847|30|n|1114|21,0,0|1|0|104001:0",

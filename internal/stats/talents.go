@@ -54,8 +54,10 @@ var (
 	entreesRe = regexp.MustCompile(`^[0-9]{1,10}:[0-9]{0,10}(;[0-9]{1,10}:[0-9]{0,10})*$`)
 )
 
-// Le source des talents ne peut être que l'une de ces quatre unités.
-var sourcesTalents = map[string]string{"n": "nameplate", "t": "target", "f": "focus", "m": "mouseover"}
+// Le source des talents ne peut être que l'une de ces quatre unités, ou « s » (self) : les
+// talents du personnage connecté, lus dans sa configuration active (addon 4.3.0). Un compagnon
+// antérieur compte « s » hors bornes et envoie la fiche sans ses talents.
+var sourcesTalents = map[string]string{"n": "nameplate", "t": "target", "f": "focus", "m": "mouseover", "s": "self"}
 
 // Point : un nœud avec des points ; Entree = 0 si inconnue (null).
 type Point struct {
