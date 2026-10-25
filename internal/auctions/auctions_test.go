@@ -146,3 +146,19 @@ func TestL6GlobalLatestDayAndRetention(t *testing.T) {
 		}
 	}
 }
+
+// RP-PvP (addon 4.6.0) is a market ruleset of its own, never folded into RP;
+// an unknown ruleset still leaves the market incomplete.
+func TestRPPvPRulesetMarket(t *testing.T) {
+	note := func(ruleset string) *lua.Table {
+		return &lua.Table{Str: map[string]any{"v": lua.Number{I: 2, IsInt: true}, "depuis": lua.Number{I: 1790035200, IsInt: true},
+			"notes": "1791044400|0|120|1791043800|18|1|90|" + ruleset + "|RP-PvP|5001|Horde|1453|340"}}
+	}
+	m, _, r := auctions.ReadNotes(note("RP_PVP"), "_classic_beta_").Join("RP-PvP", 2467)
+	if m.ID != "18-beta-90-5001-RP_PVP-Horde" || r != "" {
+		t.Fatalf("RP_PVP market: got %q %q", m.ID, r)
+	}
+	if m, _, _ = auctions.ReadNotes(note("RPPVP"), "_classic_beta_").Join("RP-PvP", 2467); m.ID != "" {
+		t.Fatalf("unknown ruleset must not form a market, got %q", m.ID)
+	}
+}

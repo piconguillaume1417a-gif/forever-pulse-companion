@@ -89,7 +89,7 @@ func ReadNotes(hdv *lua.Table, folder string) Notes {
 		m.Region, _ = integer(p[6], 1, 9999)
 		m.Realm, _ = integer(p[9], 1, 2147483647)
 		switch p[7] {
-		case "NORMAL", "PVP", "RP", "HARDCORE":
+		case "NORMAL", "PVP", "RP", "RP_PVP", "HARDCORE":
 			m.Ruleset = p[7]
 		}
 		f := strings.ToLower(folder)
