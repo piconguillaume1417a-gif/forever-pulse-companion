@@ -114,21 +114,30 @@ public static class MsiState {
         Assert ($process.ExitCode -eq 0) "$name failed: $($process.ExitCode)"
         Add-Content -LiteralPath $report -Value ("PASS: $name (non-admin, per-user)")
     }
+    function Registered([string]$code) {
+        Assert ($code -match '^\{[0-9A-F-]{36}\}$') "Invalid product identity: $code"
+        # Read the registration written by the external msiexec transaction;
+        # do not rely on MSI's state cached by the database-reading process.
+        $found = Test-Path -LiteralPath ('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $code)
+        Add-Content -LiteralPath $report -Value ("Registration $code : $found; MSI query: " + [MsiState]::MsiQueryProductState($code))
+        return $found
+    }
     $previous = Join-Path $OutDir 'previous.msi'
     $current = Join-Path $OutDir 'new.msi'
     $oldCode = ProductCode $previous
     $newCode = ProductCode $current
     Assert ($oldCode -ne $newCode) 'A new installer release must have a new ProductCode.'
     RunMsi ('/i "' + $previous + '" DESKTOPSHORTCUT=1') 'install-rc6'
-    Assert ([MsiState]::MsiQueryProductState($oldCode) -eq 5) 'rc.6 is not registered.'
+    Assert (Registered $oldCode) 'rc.6 is not registered.'
+    $installed = Join-Path $local 'Programs\ForeverPulseCompanion\ForeverPulseCompanion.exe'
+    Assert ((Get-FileHash $installed).Hash -eq 'B71FFA9B70DF217E959ED3BB7CB8E493172A131384855BB9D3DE4B485DD749AE') 'rc.6 installed the wrong binary.'
     $data = Join-Path $roaming 'ForeverPulse\Companion'
     New-Item -ItemType Directory -Force -Path $data | Out-Null
     $marker = Join-Path $data 'lifecycle-test.txt'
     [IO.File]::WriteAllText($marker, 'synthetic user data preserved')
-    $installed = Join-Path $local 'Programs\ForeverPulseCompanion\ForeverPulseCompanion.exe'
     RunMsi ('/i "' + $current + '" DESKTOPSHORTCUT=1') 'upgrade'
-    Assert ([MsiState]::MsiQueryProductState($oldCode) -ne 5) 'Old product still installed.'
-    Assert ([MsiState]::MsiQueryProductState($newCode) -eq 5) 'New product is not registered.'
+    Assert (!(Registered $oldCode)) 'Old product still installed.'
+    Assert (Registered $newCode) 'New product is not registered.'
     Assert ((Get-FileHash $installed).Hash -eq (Get-FileHash (Join-Path $OutDir 'expected.exe')).Hash) 'Upgrade installed the wrong binary.'
     # The real wizard extracts its package into a fresh folder on every attempt.
     $repair = Join-Path $OutDir 'second-launch'
@@ -138,7 +147,7 @@ public static class MsiState {
     RunMsi ('/i "' + $repairMsi + '" DESKTOPSHORTCUT=1 REINSTALL=ALL REINSTALLMODE=vomus') 'repair-same-package-new-path'
     Assert ((Get-FileHash $installed).Hash -eq (Get-FileHash (Join-Path $OutDir 'expected.exe')).Hash) 'Repair changed the binary.'
     RunMsi ('/x ' + $newCode) 'uninstall'
-    Assert ([MsiState]::MsiQueryProductState($newCode) -ne 5) 'New product still installed.'
+    Assert (!(Registered $newCode)) 'New product still installed.'
     Assert (!(Test-Path -LiteralPath $installed)) 'Uninstall left the Companion executable.'
     Assert ([IO.File]::ReadAllText($marker) -eq 'synthetic user data preserved') 'User data was changed.'
     Add-Content -LiteralPath $report -Value 'PASS: user data preserved; no Companion process launched.'
