@@ -51,6 +51,7 @@ try {
     $env:USERPROFILE = $profile
     $env:LOCALAPPDATA = Join-Path $profile 'AppData\Local'
     $env:APPDATA = Join-Path $profile 'AppData\Roaming'
+    New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA,$env:APPDATA | Out-Null
     $local = [Environment]::GetFolderPath('LocalApplicationData')
     $roaming = [Environment]::GetFolderPath('ApplicationData')
     Assert ($local.StartsWith($profile + '\') -and $roaming.StartsWith($profile + '\')) "Unexpected application data paths: $local / $roaming (profile $profile)."
