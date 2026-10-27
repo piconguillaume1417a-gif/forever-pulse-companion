@@ -32,7 +32,9 @@ if (!$Worker) {
         Invoke-WebRequest -Uri 'https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/download/v0.10.0-rc.6/ForeverPulseCompanion.msi' -OutFile (Join-Path $folder 'previous.msi')
         Assert ((Get-FileHash (Join-Path $folder 'previous.msi')).Hash -eq 'A47AF4707782D9CAC4AD1CD126FEC6B13EC58231A0270AE6D8CE1DA5DFA76610') 'Previous release fixture changed.'
         $credential = [pscredential]::new("$env:COMPUTERNAME\$account", $password)
-        $process = Start-Process -FilePath "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -Credential $credential -LoadUserProfile -WindowStyle Hidden -Wait -PassThru -ArgumentList ('-NoProfile -File "' + (Join-Path $folder 'test.ps1') + '" -Worker -OutDir "' + $folder + '"')
+        # Keep the same PowerShell edition/module paths as the workflow parent.
+        $shell = (Get-Process -Id $PID).Path
+        $process = Start-Process -FilePath $shell -Credential $credential -LoadUserProfile -WindowStyle Hidden -Wait -PassThru -ArgumentList ('-NoProfile -File "' + (Join-Path $folder 'test.ps1') + '" -Worker -OutDir "' + $folder + '"')
         Get-Content -LiteralPath (Join-Path $folder 'result.txt')
         Assert ($process.ExitCode -eq 0) "Real MSI lifecycle test failed: $($process.ExitCode)"
     } finally {
