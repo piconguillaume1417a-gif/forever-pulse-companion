@@ -141,7 +141,7 @@ public static class MsiState {
     # The real wizard extracts its package into a fresh folder on every attempt.
     $repair = Join-Path $OutDir 'second-launch'
     New-Item -ItemType Directory -Path $repair | Out-Null
-    $repairMsi = Join-Path $repair 'companion.msi'
+    $repairMsi = Join-Path $repair (Split-Path $current -Leaf)
     Copy-Item -LiteralPath $current -Destination $repairMsi
     RunMsi ('/i "' + $repairMsi + '" DESKTOPSHORTCUT=1 REINSTALL=ALL REINSTALLMODE=vomus') 'repair-same-package-new-path'
     Assert ((Get-FileHash $installed).Hash -eq (Get-FileHash (Join-Path $OutDir 'expected.exe')).Hash) 'Repair changed the binary.'
