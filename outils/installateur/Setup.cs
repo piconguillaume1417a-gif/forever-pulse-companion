@@ -133,6 +133,31 @@ internal static class Program
     }
 }
 
+// A selectable, read-only path that grows to its native wrapped line count.
+// Measuring the Edit control itself also handles long words and DPI rounding.
+internal sealed class InstallPathBox : TextBox
+{
+    internal InstallPathBox()
+    {
+        Multiline = true;
+        WordWrap = true;
+        AutoSize = false;
+    }
+
+    private void FitText()
+    {
+        if (!IsHandleCreated || ClientSize.Width <= 0) return;
+        int lines = GetLineFromCharIndex(TextLength) + 1;
+        int wanted = Math.Max(2, lines) * Font.Height + (Height - ClientSize.Height) + 8;
+        if (Height != wanted) Height = wanted;
+    }
+
+    protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); FitText(); }
+    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); FitText(); }
+    protected override void OnFontChanged(EventArgs e) { base.OnFontChanged(e); FitText(); }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); FitText(); }
+}
+
 internal sealed class SetupWindow : Form
 {
     private readonly Button install = new Button();
@@ -150,81 +175,142 @@ internal sealed class SetupWindow : Form
         AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(650, 540);
         Font = new Font("Segoe UI", 10);
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MinimumSize = new Size(550, 480);
+        FormBorderStyle = FormBorderStyle.Sizable;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
         BackColor = Color.FromArgb(247, 248, 251);
 
-        Panel header = new Panel();
-        header.SetBounds(0, 0, 650, 106);
+        TableLayoutPanel layout = new TableLayoutPanel();
+        layout.Dock = DockStyle.Fill;
+        layout.ColumnCount = 1;
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowCount = 3;
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        Controls.Add(layout);
+
+        TableLayoutPanel header = new TableLayoutPanel();
+        header.AutoSize = true;
+        header.Dock = DockStyle.Fill;
+        header.Margin = Padding.Empty;
+        header.Padding = new Padding(28, 22, 28, 20);
+        header.ColumnCount = 2;
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         header.BackColor = Color.FromArgb(24, 34, 52);
-        Controls.Add(header);
+        layout.Controls.Add(header, 0, 0);
         using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("logo.png"))
         {
             PictureBox logo = new PictureBox();
-            logo.SetBounds(28, 23, 60, 60);
+            logo.Size = new Size(60, 60);
+            logo.Margin = Padding.Empty;
             logo.SizeMode = PictureBoxSizeMode.Zoom;
             logo.Image = new Bitmap(source);
-            header.Controls.Add(logo);
+            header.Controls.Add(logo, 0, 0);
+            header.SetRowSpan(logo, 2);
         }
         Label title = new Label();
-        title.SetBounds(104, 22, 500, 34);
+        title.AutoSize = true;
+        title.Dock = DockStyle.Fill;
+        title.Margin = new Padding(0, 0, 0, 8);
         title.Font = new Font(Font.FontFamily, 18, FontStyle.Bold);
         title.ForeColor = Color.White;
         title.Text = "Forever Pulse Companion";
-        header.Controls.Add(title);
+        header.Controls.Add(title, 1, 0);
         Label subtitle = new Label();
-        subtitle.SetBounds(106, 62, 480, 24);
+        subtitle.AutoSize = true;
+        subtitle.Dock = DockStyle.Fill;
+        subtitle.Margin = Padding.Empty;
         subtitle.ForeColor = Color.FromArgb(193, 206, 228);
         subtitle.Text = "Version " + PackageInfo.Version + " · Windows 11 · 64" + Program.T(" bits", "-bit");
-        header.Controls.Add(subtitle);
+        header.Controls.Add(subtitle, 1, 1);
 
-        AddLabel(Program.T("Installer pour votre compte Windows", "Install for your Windows account"), 30, 128, 590, 28, true);
-        AddLabel(Program.T("Le Compagnon et ses guides seront ajoutés ici :", "The Companion and its guides will be added here:"), 30, 164, 590, 25, false);
-        TextBox path = new TextBox();
-        path.SetBounds(30, 193, 590, 32);
+        // Rows follow their contents, including wrapped text at larger Windows scales.
+        // Only the body scrolls on a short screen; the action buttons remain reachable.
+        Panel viewport = new Panel();
+        viewport.Dock = DockStyle.Fill;
+        viewport.AutoScroll = true;
+        viewport.Margin = Padding.Empty;
+        layout.Controls.Add(viewport, 0, 1);
+        TableLayoutPanel body = new TableLayoutPanel();
+        body.Dock = DockStyle.Top;
+        body.AutoSize = true;
+        body.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        body.ColumnCount = 1;
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        body.Padding = new Padding(30, 22, 30, 8);
+        viewport.Controls.Add(body);
+
+        AddLabel(body, Program.T("Installer pour votre compte Windows", "Install for your Windows account"), true);
+        AddLabel(body, Program.T("Le Compagnon et ses guides seront ajoutés ici :", "The Companion and its guides will be added here:"), false);
+        InstallPathBox path = new InstallPathBox();
+        path.Name = "InstallPath";
+        path.Dock = DockStyle.Top;
+        path.Margin = new Padding(0, 0, 0, 18);
         path.Text = Program.InstallDirectory;
         path.ReadOnly = true;
-        path.TabStop = false;
+        path.AccessibleName = Program.T("Dossier d'installation", "Installation folder");
         path.BackColor = Color.White;
-        Controls.Add(path);
-        AddLabel(Program.T("Votre configuration, votre connexion et vos relevés sont conservés.\nUn raccourci sera ajouté au menu Démarrer. Aucun droit administrateur.\nLe Compagnon se met ensuite à jour tout seul.",
-            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date."), 30, 240, 590, 78, false);
-        desktop.SetBounds(30, 324, 590, 28);
+        body.Controls.Add(path);
+        AddLabel(body, Program.T("Votre configuration, votre connexion et vos relevés sont conservés.\nUn raccourci sera ajouté au menu Démarrer. Aucun droit administrateur.\nLe Compagnon se met ensuite à jour tout seul.",
+            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date."), false);
+        desktop.AutoSize = true;
+        desktop.Dock = DockStyle.Top;
+        desktop.Margin = new Padding(0, 0, 0, 18);
         desktop.Text = Program.T("Ajouter aussi un raccourci sur le Bureau", "Also add a desktop shortcut");
         desktop.Checked = true;
-        Controls.Add(desktop);
-        status.SetBounds(30, 363, 590, 54);
+        body.Controls.Add(desktop);
+        status.AutoSize = true;
+        status.Dock = DockStyle.Top;
+        status.Margin = new Padding(0, 0, 0, 18);
         status.Text = Program.T("Si le Compagnon est ouvert, l'installation le fermera puis vous proposera de le rouvrir.", "If the Companion is open, setup will close it and then offer to open it again.");
-        Controls.Add(status);
-        progress.SetBounds(30, 427, 590, 12);
+        body.Controls.Add(status);
+        progress.Dock = DockStyle.Top;
+        progress.Height = 12;
+        progress.Margin = Padding.Empty;
         progress.Visible = false;
-        Controls.Add(progress);
-        close.SetBounds(342, 467, 130, 40);
+        body.Controls.Add(progress);
+        FlowLayoutPanel actions = new FlowLayoutPanel();
+        actions.AutoSize = true;
+        actions.Dock = DockStyle.Fill;
+        actions.FlowDirection = FlowDirection.RightToLeft;
+        actions.Margin = new Padding(30, 0, 30, 0);
+        actions.Padding = new Padding(0, 16, 0, 24);
+        layout.Controls.Add(actions, 0, 2);
+        close.AutoSize = true;
+        close.MinimumSize = new Size(130, 40);
+        close.Margin = new Padding(0, 0, 15, 0);
         close.Text = Program.T("Fermer", "Close");
         close.Click += delegate { Close(); };
-        Controls.Add(close);
-        install.SetBounds(487, 467, 133, 40);
+        install.AutoSize = true;
+        install.MinimumSize = new Size(133, 40);
+        install.Margin = Padding.Empty;
         install.Text = Program.T("Installer", "Install");
         install.BackColor = Color.FromArgb(36, 88, 162);
         install.ForeColor = Color.White;
         install.FlatStyle = FlatStyle.Flat;
         install.Click += InstallClick;
-        Controls.Add(install);
+        actions.Controls.Add(install);
+        actions.Controls.Add(close);
         AcceptButton = install;
         CancelButton = close;
+        ActiveControl = install;
         FormClosing += delegate(object sender, FormClosingEventArgs e) { if (installing) e.Cancel = true; };
         AutoScaleDimensions = new SizeF(96F, 96F);
-        ResumeLayout(false);
+        ResumeLayout(true);
     }
 
-    private void AddLabel(string text, int x, int y, int width, int height, bool bold)
+    private void AddLabel(TableLayoutPanel parent, string text, bool bold)
     {
         Label label = new Label();
-        label.SetBounds(x, y, width, height);
+        label.AutoSize = true;
+        label.Dock = DockStyle.Top;
+        label.Margin = new Padding(0, 0, 0, bold ? 18 : 12);
         label.Text = text;
         if (bold) label.Font = new Font(Font.FontFamily, 12, FontStyle.Bold);
-        Controls.Add(label);
+        parent.Controls.Add(label);
     }
 
     private async void InstallClick(object sender, EventArgs e)

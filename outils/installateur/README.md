@@ -1,5 +1,21 @@
 # Installateur
 
+## Affichage adaptable (27 octobre 2026)
+
+L'assistant utilise des lignes dimensionnées selon leur contenu, et une fenêtre
+redimensionnable. Le dossier d'installation reste en lecture seule et copiable au
+clavier ; il revient à la ligne et ajuste sa hauteur au nombre de lignes réellement
+rendu par Windows. Sur une petite fenêtre, le contenu central défile et les boutons
+restent accessibles. Aucun changement du chemin réel ni des opérations MSI.
+
+`Test.ps1` compile aussi `TestLayout.cs`, qui charge l'interface du véritable
+installateur sans appeler l'installation. Il vérifie 24 cas FR/EN : largeurs
+550/650/900, polices 10/14 points et chemin courant/260 caractères. Les assertions
+contrôlent les textes, la dernière ligne du chemin, les chevauchements, l'accès au
+statut par défilement et la visibilité des boutons. Les captures sont écrites dans
+le dossier de test ignoré `.go-tmp`. Ces cas utilisent le DPI réel de l'hôte ; une
+police agrandie ne constitue pas une preuve sur tous les réglages DPI de Windows.
+
 **0.10.0 (8 octobre 2026)** : toute version. `Build.ps1 -Exe <exe> -OutDir <dossier>` produit
 `ForeverPulseCompanion.msi` et `ForeverPulseCompanion-Setup.exe` (noms stables pour le lien « latest » du site) ;
 version lue dans la ressource de l'exe (chaîne `0.10.0-rc.3`, numéro MSI `0.10.3` via `update.NumeroWindows`),

@@ -139,6 +139,13 @@ foreach ($pair in @(@('CompanionExe',$Exe),@('GuideFR',(Join-Path $repo 'LISEZMO
 }
 RunExe $setup ('--preview "'+(Join-Path $work 'preview.png')+'"')
 Assert ((Get-Item -LiteralPath (Join-Path $work 'preview.png')).Length -gt 5000) 'Preview render is empty'
+$layoutTest = Join-Path $work 'TestLayout.exe'
+& "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /platform:x64 /warnaserror+ /utf8output "/out:$layoutTest" "/win32manifest:$PSScriptRoot\setup.manifest" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "$PSScriptRoot\TestLayout.cs"
+Assert ($LASTEXITCODE -eq 0) 'Layout test compilation failed'
+foreach ($culture in @('fr-FR','en-US')) {
+    RunExe $layoutTest ('"'+$setup+'" '+$culture+' "'+$work+'"')
+    Write-Output (Get-Content -LiteralPath (Join-Path $work ($culture+'.txt')) -Raw)
+}
 $runKey=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
 try { $startupAfter=if ($null -ne $runKey) { $runKey.GetValue('ForeverPulseCompanion') } else { $null } }
 finally { if ($null -ne $runKey) { $runKey.Dispose() } }
