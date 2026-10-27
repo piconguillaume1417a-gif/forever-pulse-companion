@@ -54,7 +54,7 @@ jobs:
           if-no-files-found: ignore
       - name: Hashes
         shell: pwsh
-        run: Get-FileHash dist/* -Algorithm SHA256 | Format-Table Hash, Path -AutoSize | Out-String -Width 300
+        run: Get-ChildItem dist -File | Get-FileHash -Algorithm SHA256 | Format-Table Hash, Path -AutoSize | Out-String -Width 300
       - uses: actions/upload-artifact@v4
         with:
           name: ForeverPulseCompanion
