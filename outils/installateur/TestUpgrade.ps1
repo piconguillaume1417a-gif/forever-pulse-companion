@@ -50,6 +50,14 @@ try {
     $local = [Environment]::GetFolderPath('LocalApplicationData')
     $roaming = [Environment]::GetFolderPath('ApplicationData')
     Assert ($local.StartsWith($profile + '\') -and $roaming.StartsWith($profile + '\')) 'Unexpected application data paths.'
+    # Start-Process -Credential may inherit environment strings from runneradmin.
+    # Keep compilers and MSI temporary files inside the actual test user's profile.
+    $env:USERPROFILE = $profile
+    $env:LOCALAPPDATA = $local
+    $env:APPDATA = $roaming
+    $env:TEMP = Join-Path $local 'Temp'
+    $env:TMP = $env:TEMP
+    New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
     Add-Type @'
 using System.Runtime.InteropServices;
 public static class MsiState {
