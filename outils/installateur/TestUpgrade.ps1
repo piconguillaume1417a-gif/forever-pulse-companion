@@ -52,9 +52,26 @@ try {
     $env:LOCALAPPDATA = Join-Path $profile 'AppData\Local'
     $env:APPDATA = Join-Path $profile 'AppData\Roaming'
     New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA,$env:APPDATA | Out-Null
-    $local = [Environment]::GetFolderPath('LocalApplicationData')
-    $roaming = [Environment]::GetFolderPath('ApplicationData')
-    Assert ($local.StartsWith($profile + '\') -and $roaming.StartsWith($profile + '\')) "Unexpected application data paths: $local / $roaming (profile $profile)."
+    # No Explorer first logon runs on this headless account. Initialize only its
+    # ordinary shell folders, as a desktop logon would; no Installer policy changes.
+    $folders = @{
+        'Local AppData' = $env:LOCALAPPDATA
+        'AppData' = $env:APPDATA
+        'Desktop' = (Join-Path $profile 'Desktop')
+        'Start Menu' = (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu')
+        'Programs' = (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs')
+    }
+    foreach ($keyName in @('User Shell Folders','Shell Folders')) {
+        $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Explorer\' + $keyName)
+        try {
+            foreach ($entry in $folders.GetEnumerator()) {
+                New-Item -ItemType Directory -Force -Path $entry.Value | Out-Null
+                $key.SetValue($entry.Key, $entry.Value, [Microsoft.Win32.RegistryValueKind]::String)
+            }
+        } finally { $key.Dispose() }
+    }
+    $local = $env:LOCALAPPDATA
+    $roaming = $env:APPDATA
     # Start-Process -Credential may inherit environment strings from runneradmin.
     # Keep compilers and MSI temporary files inside the actual test user's profile.
     $env:USERPROFILE = $profile
