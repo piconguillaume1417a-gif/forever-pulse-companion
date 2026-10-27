@@ -15,7 +15,13 @@ if (!$Worker) {
     New-Item -ItemType Directory -Path $folder | Out-Null
     $password = ConvertTo-SecureString (([guid]::NewGuid().ToString('N')) + 'aA1!') -AsPlainText -Force
     New-LocalUser -Name $account -Password $password -Description 'Ephemeral MSI regression test' | Out-Null
+    $policy = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey('Software\Policies\Microsoft\Windows\Installer')
+    $previousDisableMsi = $policy.GetValue('DisableMSI', $null)
     try {
+        # Windows Server runners default to DisableMSI=1 (reject all unmanaged
+        # packages for standard users). Model Windows 11's normal value, 0, only
+        # in this disposable fixture. Never change elevation/SecureRepair policy.
+        $policy.SetValue('DisableMSI', 0, [Microsoft.Win32.RegistryValueKind]::DWord)
         Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $account
         $acl = Get-Acl -LiteralPath $folder
         $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($account, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
@@ -30,6 +36,9 @@ if (!$Worker) {
         Get-Content -LiteralPath (Join-Path $folder 'result.txt')
         Assert ($process.ExitCode -eq 0) "Real MSI lifecycle test failed: $($process.ExitCode)"
     } finally {
+        if ($null -eq $previousDisableMsi) { $policy.DeleteValue('DisableMSI', $false) }
+        else { $policy.SetValue('DisableMSI', $previousDisableMsi, [Microsoft.Win32.RegistryValueKind]::DWord) }
+        $policy.Dispose()
         # Preserve bounded diagnostics as a workflow artifact, even on failure.
         $reports = Join-Path $OutDir 'installer-lifecycle'
         New-Item -ItemType Directory -Force -Path $reports | Out-Null
@@ -53,7 +62,7 @@ try {
     $env:APPDATA = Join-Path $profile 'AppData\Roaming'
     New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA,$env:APPDATA | Out-Null
     # No Explorer first logon runs on this headless account. Initialize only its
-    # ordinary shell folders, as a desktop logon would; no Installer policy changes.
+    # ordinary shell folders, as a desktop logon would; no repair security changes.
     $folders = @{
         'Local AppData' = $env:LOCALAPPDATA
         'AppData' = $env:APPDATA
