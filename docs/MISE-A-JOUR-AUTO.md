@@ -40,6 +40,18 @@ sous `min_version`).
 
 ## Publier une version
 
+Ne jamais remplacer un MSI publié par une reconstruction sous la même version,
+même pour une correction visuelle du Setup : un MSI différent avec le même
+ProductCode peut faire échouer la réparation silencieuse existante (1603,
+`SecureRepair: Hash mismatch`, incident réel du 27 octobre 2026). Incrémenter la
+version, régénérer la ressource puis publier une nouvelle release complète.
+La CI vérifie maintenant une installation rc.6, sa mise à niveau, une réparation
+depuis un nouveau chemin et la désinstallation sous un utilisateur standard jetable.
+Ces transactions sont réservées au runner GitHub hébergé, jamais au PC du propriétaire.
+Le runner Windows Server autorise temporairement les MSI utilisateur (`DisableMSI=0`,
+valeur normale du client Windows) et restaure sa valeur initiale ; les protections
+SecureRepair et les règles d'élévation ne sont jamais modifiées.
+
 1. Monter `Version` dans `internal/app/app.go`, puis `go run ./outils/mkres <version>` (ressource de
    version : numéro Windows croissant `update.NumeroWindows`, icône de l'installateur). Commit, tag `v<version>`,
    push sur `main` du dépôt public.
