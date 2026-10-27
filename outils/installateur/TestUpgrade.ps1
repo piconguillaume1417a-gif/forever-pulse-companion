@@ -100,11 +100,11 @@ public static class MsiState {
         $installer = New-Object -ComObject WindowsInstaller.Installer
         $database = $installer.OpenDatabase($path, 0)
         $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
-        $view.Execute()
+        $view.Execute() | Out-Null
         $record = $view.Fetch()
         try { return $record.GetType().InvokeMember('StringData', [Reflection.BindingFlags]::GetProperty, $null, $record, @([int]1)) }
         finally {
-            $view.Close()
+            $view.Close() | Out-Null
             foreach ($item in @($record,$view,$database,$installer)) { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($item) | Out-Null }
         }
     }
@@ -116,10 +116,9 @@ public static class MsiState {
     }
     function Registered([string]$code) {
         Assert ($code -match '^\{[0-9A-F-]{36}\}$') "Invalid product identity: $code"
-        # Read the registration written by the external msiexec transaction;
-        # do not rely on MSI's state cached by the database-reading process.
-        $found = Test-Path -LiteralPath ('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $code)
-        Add-Content -LiteralPath $report -Value ("Registration $code : $found; MSI query: " + [MsiState]::MsiQueryProductState($code))
+        $state = [MsiState]::MsiQueryProductState($code)
+        $found = $state -eq 5
+        Add-Content -LiteralPath $report -Value ("Registration $code : $found; MSI query: " + $state)
         return $found
     }
     $previous = Join-Path $OutDir 'previous.msi'
