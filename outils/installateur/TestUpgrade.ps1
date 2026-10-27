@@ -47,9 +47,13 @@ try {
     Assert (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) 'Worker must not be elevated.'
     $profile = [Environment]::GetFolderPath('UserProfile')
     Assert ((Split-Path $profile -Leaf) -like 'FPInstallerTest*') 'Unexpected profile.'
+    # Resolve expandable known-folder paths only after replacing inherited values.
+    $env:USERPROFILE = $profile
+    $env:LOCALAPPDATA = Join-Path $profile 'AppData\Local'
+    $env:APPDATA = Join-Path $profile 'AppData\Roaming'
     $local = [Environment]::GetFolderPath('LocalApplicationData')
     $roaming = [Environment]::GetFolderPath('ApplicationData')
-    Assert ($local.StartsWith($profile + '\') -and $roaming.StartsWith($profile + '\')) 'Unexpected application data paths.'
+    Assert ($local.StartsWith($profile + '\') -and $roaming.StartsWith($profile + '\')) "Unexpected application data paths: $local / $roaming (profile $profile)."
     # Start-Process -Credential may inherit environment strings from runneradmin.
     # Keep compilers and MSI temporary files inside the actual test user's profile.
     $env:USERPROFILE = $profile
