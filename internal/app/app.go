@@ -108,6 +108,12 @@ type App struct {
 	resume      []Portee
 	resumeLang  i18n.Lang
 	resumeValid bool
+
+	// 0.10.0-rc.8 : dernière issue notée au journal pour le repli de région, pour ne pas
+	// répéter la même ligne à chaque paquet.
+	muPortal   sync.Mutex
+	portalNote bool
+	portalVu   string
 }
 
 // New ne charge plus le cumul (0.7.4) : il est relu de la base le temps d'intégrer
@@ -549,7 +555,7 @@ func (a *App) envoieStats(ctx context.Context) error {
 		return err
 	}
 	for {
-		meta, sheets, err := a.Store.StatsPending(sender.MaxBody - 64<<10)
+		meta, chemin, sheets, err := a.Store.StatsPendingSource(sender.MaxBody - 64<<10)
 		if err != nil {
 			return err
 		}
@@ -557,7 +563,7 @@ func (a *App) envoieStats(ctx context.Context) error {
 			a.echecsStats = 0
 			return nil
 		}
-		if err := a.posteStats(ctx, token, meta, sheets, a.schemaStats()); err != nil {
+		if err := a.posteStats(ctx, token, a.MetaEnvoi(chemin, meta), sheets, a.schemaStats()); err != nil {
 			return err
 		}
 	}
@@ -674,6 +680,7 @@ func (a *App) envoie(ctx context.Context) error {
 			a.echecs = 0
 			return nil
 		}
+		f.Scopes = a.ScopesEnvoi(f)
 		body, err := Body(f, batches)
 		if err != nil {
 			return err
