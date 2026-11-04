@@ -341,6 +341,7 @@ func runDry(dataDir string, args []string, out string) error {
 			break
 		}
 		n++
+		f.Scopes = a.ScopesEnvoi(f)
 		body, err := app.Body(f, batches)
 		if err != nil {
 			return err
@@ -366,12 +367,12 @@ func runDry(dataDir string, args []string, out string) error {
 	}
 	ns := 0
 	for {
-		meta, sheets, err := st.StatsPending(sender.MaxBody - 64<<10)
+		meta, chemin, sheets, err := st.StatsPendingSource(sender.MaxBody - 64<<10)
 		if err != nil || len(sheets) == 0 {
 			break
 		}
 		ns++
-		body, err := app.StatsBody(meta, sheets, stats.SchemaEnvoi)
+		body, err := app.StatsBody(a.MetaEnvoi(chemin, meta), sheets, stats.SchemaEnvoi)
 		if err != nil {
 			return err
 		}
@@ -406,6 +407,7 @@ func runSync(dataDir string, args []string) error {
 	ctx := context.Background()
 	vault := secret.ForContext(dir, cfg.SiteURL, dataDir != "" || os.Getenv("WOWSYNC_DATA_DIR") != "")
 	a.Token, a.SaveToken = vault.Get, vault.Set
+	a.RemiseEnFileRegions()
 	for _, p := range fichiers(cfg, args) {
 		if _, err := a.ProcessFile(ctx, p); err != nil {
 			log.Printf("%s : %v", filepath.Base(p), err)
@@ -469,6 +471,8 @@ func runConnect(dataDir string) error {
 // 0.10.0 : pret (facultatif) est appelé une fois la première passe terminée ; il
 // confirme une mise à jour à l'essai.
 func engine(ctx context.Context, a *app.App, cfg config.Config, log *logx.Logger, reveil <-chan struct{}, pret func()) {
+	// 0.10.0-rc.8 : une seule fois, avant le premier envoi.
+	a.RemiseEnFileRegions()
 	w := watch.New()
 	// Au démarrage : les deux fichiers, .lua et .bak (la session précédente peut
 	// n'exister plus que dans le .bak).

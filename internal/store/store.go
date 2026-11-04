@@ -426,21 +426,30 @@ func (s *Store) AddStatsFile(ctx context.Context, sha string, meta []byte, sheet
 // StatsPending : les fiches en attente d'un même fichier (le plus ancien d'abord),
 // avec ce qui accompagne chaque envoi de ce fichier (meta).
 func (s *Store) StatsPending(limitBytes int) (meta []byte, sheets []StatSheet, err error) {
+	meta, _, sheets, err = s.StatsPendingSource(limitBytes)
+	return meta, sheets, err
+}
+
+// StatsPendingSource : comme StatsPending, avec le chemin du fichier d'origine, connu
+// par la ligne de files de même empreinte (vide si elle n'existe pas). Il n'est lu que
+// pour le repli de région et ne part jamais dans un envoi.
+func (s *Store) StatsPendingSource(limitBytes int) (meta []byte, chemin string, sheets []StatSheet, err error) {
 	var sha string
 	err = s.db.QueryRow(`select file_sha256 from stats_queue where state='pending' order by queued_at, id limit 1`).Scan(&sha)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, nil
+		return nil, "", nil, nil
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	var m string
-	if err := s.db.QueryRow(`select meta from stats_files where sha256=?`, sha).Scan(&m); err != nil {
-		return nil, nil, err
+	if err := s.db.QueryRow(`select m.meta, coalesce(f.path,'') from stats_files m left join files f on f.sha256=m.sha256 where m.sha256=?`, sha).
+		Scan(&m, &chemin); err != nil {
+		return nil, "", nil, err
 	}
 	rows, err := s.db.Query(`select id,digest,payload,bytes from stats_queue where state='pending' and file_sha256=? order by id`, sha)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	defer rows.Close()
 	total := len(m)
@@ -449,7 +458,7 @@ func (s *Store) StatsPending(limitBytes int) (meta []byte, sheets []StatSheet, e
 		var p string
 		var n int
 		if err := rows.Scan(&f.ID, &f.Digest, &p, &n); err != nil {
-			return nil, nil, err
+			return nil, "", nil, err
 		}
 		if len(sheets) > 0 && total+n+1 > limitBytes {
 			break
@@ -458,7 +467,7 @@ func (s *Store) StatsPending(limitBytes int) (meta []byte, sheets []StatSheet, e
 		f.Payload = []byte(p)
 		sheets = append(sheets, f)
 	}
-	return []byte(m), sheets, rows.Err()
+	return []byte(m), chemin, sheets, rows.Err()
 }
 
 // MarkStats change l'état de fiches, seulement si leur empreinte est toujours celle

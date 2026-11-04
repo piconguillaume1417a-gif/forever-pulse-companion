@@ -87,6 +87,9 @@ func escape(p string) string {
 	return string(r)
 }
 
+// OpenShared ouvre un fichier du jeu en lecture seule, sans jamais le verrouiller.
+func OpenShared(path string) (*os.File, error) { return openShared(path) }
+
 // Read lit tout le fichier en mémoire, partagé, puis referme aussitôt.
 func Read(path string) ([]byte, string, error) {
 	f, err := openShared(path)

@@ -1,5 +1,41 @@
 # Forever Pulse Companion
 
+## Repli de région et remise en file unique (0.10.0-rc.8, préparée, non publiée)
+
+**Un code connu n'est jamais remplacé.** `1` à `5`, `91` à `95`, `US`, `NA`, `KR`, `EU`, `TW` et `CN` (casse et espaces
+indifférents) partent tels que l'addon les a écrits ; le site les traduit.
+
+**Code inconnu ou vide.** Au moment de l'envoi seulement, le compagnon lit la valeur de `portal` dans `WTF/Config.wtf` du
+dossier de jeu du fichier envoyé, et met `US`, `KR`, `EU`, `TW` ou `CN` dans les périmètres du recensement et les contextes
+des statistiques. Les lots déjà en base en profitent : `files.scopes` et `stats_files.meta` gardent l'ancien code. Toute autre
+valeur (`test`, `public-test`, pas de ligne, deux valeurs différentes), un fichier absent, de plus de 256 Kio ou illisible
+laissent l'envoi inchangé, et le site refuse comme avant. Les notes d'enchères ne changent pas. Un périmètre ou un contexte dont
+`environment` vaut `beta` ou `ptr` n'est jamais remplacé et reste refusé. `Config.wtf` n'est pas ouvert si aucun périmètre ni
+contexte du fichier n'est concerné ; il l'est si l'un d'eux l'est, même quand les lots de cet envoi en citent un autre, connu.
+
+**Décision prise par défaut, à confirmer par le propriétaire :** le repli ne s'applique que si le dossier de jeu est exactement
+`_forever_` (casse indifférente). Sur `_beta_`, `_ptr_` ou `_xptr_`, 90 et 110 seraient sinon réattribués à une région de
+sortie. La règle tient dans une constante et une fonction de `internal/portal/portal.go`. Limite : `_forever_` a aussi servi à
+la bêta, donc la règle de dossier seule ne les sépare pas : ce sont la règle d'`environment` ci-dessus et le plancher de date du
+site qui le font. Autre limite : la valeur est lue à l'envoi, y compris pour un lot ancien remis en file, elle peut donc différer
+du portail en service quand le fichier a été écrit.
+
+**`Config.wtf` contient aussi le nom du compte.** Le lecteur parcourt le fichier ligne par ligne, ne garde que la valeur de
+`portal`, ne rend qu'une constante d'une table fixe et n'a aucun texte d'erreur. Le journal dit `portal utilisé : EU` ou
+`portal non résolu`, rien d'autre. Rien de ce fichier n'entre dans `companion.db`.
+
+**Remise en file unique.** Au premier démarrage, dans une seule transaction SQLite avec la clé `region_requeue_v1` : les lots et
+les fiches de statistiques refusés pour le motif `source_disabled`, datés du 3 novembre 2026, 12:00 Paris
+(`2026-11-03T11:00:00Z`) ou après, repassent en attente. Aucun autre motif. Les lots se jugent sur `observed_at`. Les fiches n'ont
+pas d'`observed_at` : `fresh` (la date la plus récente portée par la fiche) et `queued_at` doivent tous deux atteindre le plancher.
+Une fiche de la bêta relue après le plancher reste donc refusée, sauf si le personnage a été revu ensuite ; le site juge alors
+chaque relevé sur sa date. Au plus 50 000 lignes par table, les plus anciennes d'abord ; les comptes vont au journal, le surplus
+reste refusé. Une ligne refusée de nouveau reste refusée. Un arrêt brutal avant la validation ne change rien et le démarrage
+suivant recommence ; après la validation, rien ne se rejoue. Une version future peut poser une nouvelle clé.
+
+**Ordre de publication.** Ne publier cette version qu'après vérification en PROD des candidates SQL d'alias et de la Chine. Plus
+tôt, ces lignes seraient refusées de nouveau et la clé serait consommée. Voir [docs/MISE-A-JOUR-AUTO.md](docs/MISE-A-JOUR-AUTO.md).
+
 ## Base locale allégée (0.10.0)
 
 Le contenu d'un lot de recensement **envoyé depuis plus de 3 jours** est effacé de `companion.db`, deux minutes
@@ -189,6 +225,8 @@ La case écrit la valeur `ForeverPulseCompanion` dans `HKEY_CURRENT_USER\Softwar
 
 Le recensement et les statistiques de `ForeverPulse.lua` sont envoyés après décodage, selon `docs/data-contract.md` du site. Depuis 0.8.0, les prix autorisés de `Auctionator.lua` et le catalogue d'objets de Forever Pulse suivent aussi `CONTRAT-HDV-v1.md` révision 2.
 
+Depuis la 0.10.0-rc.8, la région d'un périmètre ou d'un contexte de statistiques peut valoir `US`, `KR`, `EU`, `TW` ou `CN`, d'après la valeur de `portal` de `WTF/Config.wtf`, si le code de l'addon est inconnu ou vide et que le dossier de jeu est `_forever_`. Voir « Repli de région » plus haut.
+
 ### Recensement : `ForeverPulseCensusDB` → `/api/ingest/census` (schéma 4)
 
 - par lot :
@@ -235,8 +273,9 @@ Depuis la 0.5.0, il lit aussi le schéma 6 de l'addon 3.7.1 : les noms sont rang
 - Aucun instant brut de la note `hdv` (`ts`, `dc`, `tz`, `tl`, `depuis`), aucun `uiMapID`, aucune faction de personnage dans le flux des prix. Seule l'identité prouvée du marché et la provenance du jour source partent.
 - Aucun jour de prix sans marché unique prouvé, aucun prix bas fabriqué à partir du haut, aucune donnée d'`Auctionator.lua.bak`.
 - Aucun `occurred_at` : un relevé prouve une présence à un instant, jamais la date d'un événement.
+- Aucune ligne de `Config.wtf` : ni nom de compte, ni dernier personnage, ni aucun autre réglage. Seule la région déduite de la valeur de `portal` peut partir, et ces lignes ne sont ni gardées, ni journalisées, ni stockées.
 
-Le compagnon lit `ForeverPulse.lua`, `ForeverPulse.lua.bak` et, depuis 0.8.0, `Auctionator.lua`. Il n'écrit, ne renomme ni ne supprime rien dans le dossier du jeu. Il ne lit pas la mémoire du jeu et n'automatise aucune touche.
+Le compagnon lit `ForeverPulse.lua`, `ForeverPulse.lua.bak`, depuis 0.8.0 `Auctionator.lua` et, depuis 0.10.0-rc.8, si un code de région est inconnu, la valeur de `portal` de `WTF/Config.wtf` du dossier `_forever_`. Il n'écrit, ne renomme ni ne supprime rien dans le dossier du jeu. Il ne lit pas la mémoire du jeu et n'automatise aucune touche.
 
 ## Désinstaller
 
