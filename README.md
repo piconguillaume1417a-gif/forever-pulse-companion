@@ -2,6 +2,8 @@
 
 Windows companion of the **Forever Pulse** addon for *World of Warcraft: Forever*. It reads
 the SavedVariables written by the addon and uploads them to https://forever-pulse.com.
+Since 0.10.0-rc.8, when a region code is unknown, it also reads the `portal` value of
+`WTF/Config.wtf` in the `_forever_` game folder, and nothing else from that file.
 It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
 
 - **Download**: [ForeverPulseCompanion-Setup.exe](https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest/download/ForeverPulseCompanion-Setup.exe)
@@ -18,6 +20,40 @@ It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
 - **License**: [MIT](LICENSE).
 
 Build: `go build -trimpath -ldflags "-H windowsgui -s -w" -o ForeverPulseCompanion.exe ./cmd/forever-pulse-companion` (Go 1.24).
+
+## Region fallback and one-time requeue (0.10.0-rc.8, prepared, not published)
+
+**Known codes are never replaced.** `1`–`5`, `91`–`95`, `US`, `NA`, `KR`, `EU`, `TW` and `CN` (any case, surrounding
+spaces ignored) leave exactly as the addon wrote them; the website translates them.
+
+**Unknown or empty codes.** At send time only, the companion reads the `portal` value of `WTF/Config.wtf` in the game
+folder of the file being sent, and uses `US`, `KR`, `EU`, `TW` or `CN` for the census scopes and the statistics contexts.
+This also covers batches already in the local database: `files.scopes` and `stats_files.meta` keep the old code. Any
+other value (`test`, `public-test`, no line, two different values), a missing, oversized (over 256 KiB) or unreadable file
+leaves the upload unchanged, and the website refuses it as before. Auction notes are not touched. `Config.wtf` is not
+opened when every code in the upload is known.
+
+**Default decision, to be confirmed by the owner:** the fallback applies only when the game folder is exactly `_forever_`
+(any case). On `_beta_`, `_ptr_` or `_xptr_`, codes 90 and 110 would otherwise be reassigned to a release region. The rule is
+one constant and one function in `internal/portal/portal.go`. Limit: `_forever_` also held beta files, so inside that folder
+the website's date floor is what refuses older observations, not the folder rule. Another limit: the value is read when
+sending, so it can differ from the portal in use when the file was written.
+
+**`Config.wtf` also holds the account name.** The reader goes line by line, keeps nothing but the `portal` value, returns
+only a constant from a fixed table and has no error text. The log says `portal utilisé : EU` or `portal non résolu`, nothing
+more. Nothing from that file is stored in `companion.db`.
+
+**One-time requeue.** At the first start, in one SQLite transaction with the key `region_requeue_v1`: rejected
+batches and statistics sheets with the reason `source_disabled`, dated on or after 3 November 2026, 12:00 Paris
+(`2026-11-03T11:00:00Z`), go back to pending. No other reason qualifies. Batches use `observed_at`. Sheets have no
+`observed_at`, so both `fresh` (the newest date the sheet carries) and `queued_at` must reach the floor: a beta sheet read
+after the floor stays rejected, unless the character was seen again after it, and the website then judges each reading on
+its own date. At most 50,000 rows per table, oldest first; the counts are logged, and rows above the limit stay rejected.
+A row rejected again stays rejected. A crash before the commit changes nothing and the next start runs it again; a crash
+after the commit does not repeat it. A later version can use a new key.
+
+**Publication order.** Publish this version only after the alias and China SQL candidates are verified in production.
+Earlier, those rows are rejected again and the key is already spent. See [docs/MISE-A-JOUR-AUTO.md](docs/MISE-A-JOUR-AUTO.md).
 
 ## Lighter local database (0.10.0)
 
@@ -147,9 +183,11 @@ The window only exists while it is open: closing it frees everything it uses, an
 
 `ForeverPulseCensusDB` sends observed characters to `/api/ingest/census` (schema 4); `ForeverPulseStatsDB` sends character statistics and their name catalogue to `/api/ingest/stats` (schema 1; schema 2 on branch `feat/talent-specs` adds each character's latest talent capture and the talent tree catalogue, never the inspected player's loadout name). The format remains `docs/data-contract.md` in the website repository. Since 0.8.0, authorised prices from `AUCTIONATOR_PRICE_DATABASE` and objects from `ForeverPulseStatsDB.objets` v1 go to `/api/ingest/auctions` (schema 1), according to `CONTRAT-HDV-v1.md` revision 2: file hash and versions, complete proven market identity, item number, raw source day and provenance, known low/high/current prices as decimal text, known quantity including zero, and optional object metadata. No price observation timestamp is fabricated.
 
+Since 0.10.0-rc.8, the `region` of a census scope or a statistics context can be `US`, `KR`, `EU`, `TW` or `CN` from the `portal` value of `WTF/Config.wtf`, when the addon's code is unknown or empty and the game folder is `_forever_`. See "Region fallback" above.
+
 ## What is never sent
 
-`ForeverPulseScanDB`, chat, Battle.net/account identifiers, paths and companion settings never enter upload bodies. Neither do Auctionator's personal variables or any of their values: `AUCTIONATOR_POSTING_HISTORY`, `AUCTIONATOR_SHOPPING_LISTS`, `AUCTIONATOR_RECENT_SEARCHES`, `AUCTIONATOR_SELLING_GROUPS`, `AUCTIONATOR_CONFIG`, `AUCTIONATOR_SAVEDVARS`, `AUCTIONATOR_CHARACTER_CONFIG`, `AUCTIONATOR_VENDOR_PRICE_CACHE`. The price upload contains no raw `hdv` note timestamps, client clock offset, timezone, interface-load time or map ID, no unproven day, no invented low price, and no `occurred_at`. Upload credentials travel in the authentication header. Browser-assisted connection returns a credential only to the native client over its private polling response, then stores it in the Windows vault. The companion reads `ForeverPulse.lua`, its backup and current `Auctionator.lua`; it never writes, renames or deletes anything in the game folder.
+`ForeverPulseScanDB`, chat, Battle.net/account identifiers, paths and companion settings never enter upload bodies. Neither do Auctionator's personal variables or any of their values: `AUCTIONATOR_POSTING_HISTORY`, `AUCTIONATOR_SHOPPING_LISTS`, `AUCTIONATOR_RECENT_SEARCHES`, `AUCTIONATOR_SELLING_GROUPS`, `AUCTIONATOR_CONFIG`, `AUCTIONATOR_SAVEDVARS`, `AUCTIONATOR_CHARACTER_CONFIG`, `AUCTIONATOR_VENDOR_PRICE_CACHE`. The price upload contains no raw `hdv` note timestamps, client clock offset, timezone, interface-load time or map ID, no unproven day, no invented low price, and no `occurred_at`. Upload credentials travel in the authentication header. Browser-assisted connection returns a credential only to the native client over its private polling response, then stores it in the Windows vault. The companion reads `ForeverPulse.lua`, its backup and current `Auctionator.lua`, and since 0.10.0-rc.8, only when a region code is unknown, the `portal` value of `WTF/Config.wtf` in the `_forever_` folder. The other lines of `Config.wtf`, including the account name and the last character, are neither kept, nor logged, nor stored, nor sent. It never writes, renames or deletes anything in the game folder.
 
 Since 0.4.0 the companion also reads the compact format written by addon 3.7.0 (schema 5: shared dictionaries, coded `/who` batches, channel deltas). It expands it before any check, so what reaches the website is exactly what the same capture would have produced in the previous format (schema 4).
 

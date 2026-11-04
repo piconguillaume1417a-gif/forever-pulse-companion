@@ -64,6 +64,19 @@ SecureRepair et les règles d'élévation ne sont jamais modifiées.
    `/releases/latest`) avec les cinq fichiers : exe, MSI, Setup, `latest.json`, `latest.json.sig`.
    Lien stable de l'installateur : `https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest/download/ForeverPulseCompanion-Setup.exe`.
 
+## 0.10.0-rc.8 : conditions de publication (préparée, non publiée)
+
+Pas de tag, de release, de manifeste ni de `min_version` à ce stade. La décision revient au propriétaire.
+
+- **Ordre.** Publier seulement après vérification en PROD des candidates SQL d'alias (91 à 95) et de la Chine. La remise en
+  file unique (`region_requeue_v1`) se joue au premier démarrage. Si elle tourne avant ces candidates, les lots en 95 sont
+  refusés de nouveau et la clé est consommée. Pour un lot arrivé trop tard, une version suivante doit poser une nouvelle clé.
+- **Déploiement.** Une version non imposée n'est qu'annoncée (recherche 3 minutes après le démarrage, puis toutes les 24 h).
+  Seule `min_version` l'installe aussitôt.
+- **Correspondance décidée par le propriétaire :** 91→1 US/NA, 92→2 KR, 93→3 EU, 94→4 TW, 95→5 CN. Le site la porte, pas le
+  Compagnon. Seul 93↔EU a un indice réel, sur un seul PC.
+- **Ressource.** Elle a été régénérée par `go run ./outils/mkres 0.10.0-rc.8`. La CI compare la version de l'exécutable.
+
 ## Limites
 
 - Exécutable non signé Authenticode : SmartScreen / Smart App Control peuvent le bloquer.
