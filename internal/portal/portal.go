@@ -193,9 +193,11 @@ func regionFixe(brut []byte) string {
 }
 
 // RepliObjets applique le repli à un objet JSON { nom : { …, "region": … } } : les
-// périmètres d'un fichier, les contextes de ses statistiques. valeur n'est appelée
-// que si au moins une région est inconnue ou vide. Un objet sans remplacement est
-// rendu octet pour octet ; seuls les membres remplacés changent.
+// périmètres d'un fichier, les contextes de ses statistiques. Un membre marqué beta ou
+// ptr n'est jamais une cible : il garde sa valeur, donc le refus du site, car le dossier
+// _forever_ a aussi servi à la bêta et ces observations ne doivent pas entrer dans une
+// région de sortie. valeur n'est appelée que si au moins une cible existe. Un objet sans
+// remplacement est rendu octet pour octet ; seuls les membres remplacés changent.
 func RepliObjets(objets []byte, valeur func() (string, bool)) ([]byte, bool) {
 	ms, err := schema.Membres(objets)
 	if err != nil {
@@ -211,13 +213,16 @@ func RepliObjets(objets []byte, valeur func() (string, bool)) ([]byte, bool) {
 		if err != nil {
 			continue
 		}
-		j, connu := -1, false
+		j, connu, test := -1, false, false
 		for k, x := range in {
-			if x.K == "region" {
+			switch x.K {
+			case "region":
 				j, connu = k, regionConnue(x.V)
+			case "environment":
+				test = environnementTest(x.V)
 			}
 		}
-		if !connu {
+		if !connu && !test {
 			cibles = append(cibles, cible{i, j, in})
 		}
 	}
@@ -261,6 +266,20 @@ func RepliMeta(meta []byte, valeur func() (string, bool)) []byte {
 		return schema.Assemble(ms)
 	}
 	return meta
+}
+
+// environnementTest : l'environnement écrit par l'addon (IsTestBuild) vaut beta, ou ptr
+// pour un client de test. Absent ou live : le membre reste éligible au repli.
+func environnementTest(brut json.RawMessage) bool {
+	var v string
+	if err := json.Unmarshal(brut, &v); err != nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "beta", "ptr":
+		return true
+	}
+	return false
 }
 
 // regionConnue lit une région telle qu'écrite dans le JSON : un texte ou un nombre.

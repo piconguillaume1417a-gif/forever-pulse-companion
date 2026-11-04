@@ -243,6 +243,19 @@ func TestRepliObjets(t *testing.T) {
 			t.Fatalf("%q : %s", x, out)
 		}
 	}
+	// Un membre de test n'est jamais une cible : pas de lecture s'il est seul, et il garde
+	// sa valeur à côté d'un membre live remplacé. Absent ou live reste éligible.
+	for _, env := range []string{`"beta"`, `"BETA"`, `" ptr "`} {
+		seul := `{"a":{"environment":` + env + `,"region":"90"}}`
+		if out, ch := RepliObjets([]byte(seul), jamais); ch || string(out) != seul {
+			t.Fatalf("%s seul : %s", env, out)
+		}
+		deux := `{"a":{"environment":` + env + `,"region":"90"},"b":{"environment":"live","region":"96"},"c":{"region":"96"}}`
+		attenduDeux := `{"a":{"environment":` + env + `,"region":"90"},"b":{"environment":"live","region":"EU"},"c":{"region":"EU"}}`
+		if out, ch := RepliObjets([]byte(deux), eu); !ch || string(out) != attenduDeux {
+			t.Fatalf("%s avec live : %s", env, out)
+		}
+	}
 	// La valeur n'est lue qu'une fois par objet, quel que soit le nombre d'inconnus.
 	n := 0
 	un := func() (string, bool) { n++; return "KR", true }

@@ -56,7 +56,7 @@ func (a *App) remiseRegions(plancher int64, borne int) {
 }
 
 // valeurPortal : la lecture à la demande pour un corps d'envoi. Config.wtf est relu au
-// plus une fois par corps, et pas du tout si toutes les régions sont connues. Le journal
+// plus une fois par corps, et pas du tout si aucun membre n'est une cible du repli. Le journal
 // n'en dit que « portal utilisé : EU » ou « portal non résolu », une fois par changement.
 func (a *App) valeurPortal(chemin string) func() (string, bool) {
 	return func() (string, bool) {

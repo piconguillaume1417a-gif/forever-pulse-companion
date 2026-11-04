@@ -146,9 +146,14 @@ func (b *bancRegions) config(contenu string) {
 }
 
 // fichierRegion : un fichier avec un lot de recensement et une fiche de statistiques,
-// dont le périmètre et le contexte portent ce code de région.
+// dont le périmètre et le contexte portent ce code de région, dans l'environnement live.
 func fichierRegion(seed int, code string) []byte {
+	return fichierRegionEnv(seed, code, "live")
+}
+
+func fichierRegionEnv(seed int, code, env string) []byte {
 	data := string(fichierStats(seed, 1790505847, map[string][]string{"00000001": {"1790505847|20|n|60:0,94:5"}}))
+	data = strings.ReplaceAll(data, `"beta"`, fmt.Sprintf("%q", env))
 	return []byte(strings.ReplaceAll(data, `"90"`, fmt.Sprintf("%q", code)))
 }
 
@@ -242,6 +247,33 @@ func TestRepliInconnuAvecPortal(t *testing.T) {
 			}
 			if j := b.journal(); nbLignes(j, "portal utilisé : EU") != 1 {
 				t.Fatalf("journal :\n%s", j)
+			}
+		})
+	}
+}
+
+// _forever_ a aussi servi à la bêta : un contexte de test dans ce dossier garde son code
+// et son refus, même avec un portail clair, et Config.wtf n'est pas ouvert s'il est seul.
+func TestRepliEnvironnementDeTestInchange(t *testing.T) {
+	for i, env := range []string{"beta", "BETA", " ptr "} {
+		t.Run(env, func(t *testing.T) {
+			b := nouveauBancRegions(t, "_forever_")
+			b.config(`SET portal "EU"` + "\n")
+			b.lit(fichierRegionEnv(i+1, "90", env))
+			if err := b.a.Flush(context.Background(), false); err != nil {
+				t.Fatal(err)
+			}
+			if len(b.srv.stats) == 0 {
+				t.Fatal("aucune statistique envoyée")
+			}
+			var s struct {
+				Contexts map[string]map[string]any `json:"contexts"`
+			}
+			if err := json.Unmarshal(b.srv.stats[len(b.srv.stats)-1], &s); err != nil {
+				t.Fatal(err)
+			}
+			if got := s.Contexts["beta-4619-PVP"]["region"]; got != "90" {
+				t.Fatalf("contexte de test envoyé en %v", got)
 			}
 		})
 	}

@@ -9,14 +9,16 @@ indifférents) partent tels que l'addon les a écrits ; le site les traduit.
 dossier de jeu du fichier envoyé, et met `US`, `KR`, `EU`, `TW` ou `CN` dans les périmètres du recensement et les contextes
 des statistiques. Les lots déjà en base en profitent : `files.scopes` et `stats_files.meta` gardent l'ancien code. Toute autre
 valeur (`test`, `public-test`, pas de ligne, deux valeurs différentes), un fichier absent, de plus de 256 Kio ou illisible
-laissent l'envoi inchangé, et le site refuse comme avant. Les notes d'enchères ne changent pas. `Config.wtf` n'est pas ouvert
-si tous les codes de l'envoi sont connus.
+laissent l'envoi inchangé, et le site refuse comme avant. Les notes d'enchères ne changent pas. Un périmètre ou un contexte dont
+`environment` vaut `beta` ou `ptr` n'est jamais remplacé et reste refusé. `Config.wtf` n'est pas ouvert si aucun périmètre ni
+contexte du fichier n'est concerné ; il l'est si l'un d'eux l'est, même quand les lots de cet envoi en citent un autre, connu.
 
 **Décision prise par défaut, à confirmer par le propriétaire :** le repli ne s'applique que si le dossier de jeu est exactement
 `_forever_` (casse indifférente). Sur `_beta_`, `_ptr_` ou `_xptr_`, 90 et 110 seraient sinon réattribués à une région de
 sortie. La règle tient dans une constante et une fonction de `internal/portal/portal.go`. Limite : `_forever_` a aussi servi à
-la bêta ; dans ce dossier, c'est le plancher de date du site qui refuse les observations anciennes, pas la règle de dossier.
-Autre limite : la valeur est lue à l'envoi, elle peut différer du portail en service quand le fichier a été écrit.
+la bêta, donc la règle de dossier seule ne les sépare pas : ce sont la règle d'`environment` ci-dessus et le plancher de date du
+site qui le font. Autre limite : la valeur est lue à l'envoi, y compris pour un lot ancien remis en file, elle peut donc différer
+du portail en service quand le fichier a été écrit.
 
 **`Config.wtf` contient aussi le nom du compte.** Le lecteur parcourt le fichier ligne par ligne, ne garde que la valeur de
 `portal`, ne rend qu'une constante d'une table fixe et n'a aucun texte d'erreur. Le journal dit `portal utilisé : EU` ou

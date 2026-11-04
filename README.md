@@ -30,14 +30,16 @@ spaces ignored) leave exactly as the addon wrote them; the website translates th
 folder of the file being sent, and uses `US`, `KR`, `EU`, `TW` or `CN` for the census scopes and the statistics contexts.
 This also covers batches already in the local database: `files.scopes` and `stats_files.meta` keep the old code. Any
 other value (`test`, `public-test`, no line, two different values), a missing, oversized (over 256 KiB) or unreadable file
-leaves the upload unchanged, and the website refuses it as before. Auction notes are not touched. `Config.wtf` is not
-opened when every code in the upload is known.
+leaves the upload unchanged, and the website refuses it as before. Auction notes are not touched. A scope or context whose
+`environment` is `beta` or `ptr` is never replaced and stays refused. `Config.wtf` is not opened when no scope or context of
+the file qualifies; it is opened when one does, even if the batches of this upload point at another one with a known code.
 
 **Default decision, to be confirmed by the owner:** the fallback applies only when the game folder is exactly `_forever_`
 (any case). On `_beta_`, `_ptr_` or `_xptr_`, codes 90 and 110 would otherwise be reassigned to a release region. The rule is
-one constant and one function in `internal/portal/portal.go`. Limit: `_forever_` also held beta files, so inside that folder
-the website's date floor is what refuses older observations, not the folder rule. Another limit: the value is read when
-sending, so it can differ from the portal in use when the file was written.
+one constant and one function in `internal/portal/portal.go`. Limit: `_forever_` also held beta files, so the folder rule
+alone does not separate them: the `environment` rule above and the website's date floor do. Another limit: the value is read
+when sending, including for an older batch put back in the queue, so it can differ from the portal in use when the file was
+written.
 
 **`Config.wtf` also holds the account name.** The reader goes line by line, keeps nothing but the `portal` value, returns
 only a constant from a fixed table and has no error text. The log says `portal utilisé : EU` or `portal non résolu`, nothing
