@@ -4,6 +4,13 @@ Windows companion of the **Forever Pulse** addon for *World of Warcraft: Forever
 the SavedVariables written by the addon and uploads them to https://forever-pulse.com.
 It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
 
+Version 0.10.0-rc.8 fixes Census delivery for large backlogs: requests contain at most
+500 batches and 16 referenced scopes, with byte limits checked on the full request.
+A rejected request is narrowed down to the affected whole batch; other valid batches
+continue. Temporary or unknown failures keep data pending, and rejected data stays
+visible in the status. Existing rejected batches are retained and are not automatically
+requeued by this update. Individual scans are not fragmented.
+
 - **Download**: [ForeverPulseCompanion-Setup.exe](https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest/download/ForeverPulseCompanion-Setup.exe)
   from the [latest release](https://github.com/piconguillaume1417a-gif/forever-pulse-companion/releases/latest)
   (Windows 11 x64, per-user, no administrator rights; English or French). Uninstall from

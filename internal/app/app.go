@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	Version = "0.10.0-rc.7"
+	Version = "0.10.0-rc.8"
 	Nom     = "forever-pulse-companion"
 )
 
@@ -436,6 +436,21 @@ func scopeObj(f *schema.Fichier) schema.Obj {
 
 // Body construit le corps d'un envoi sans transmettre l'identifiant durable de l'addon.
 func Body(f *store.File, batches []store.QueuedBatch) ([]byte, error) {
+	var allScopes map[string]json.RawMessage
+	if err := json.Unmarshal(f.Scopes, &allScopes); err != nil {
+		return nil, errors.New("invalid census file scopes")
+	}
+	usedScopes := map[string]json.RawMessage{}
+	for _, batch := range batches {
+		if allScopes[batch.ScopeID] == nil {
+			return nil, errors.New("missing census batch scope")
+		}
+		usedScopes[batch.ScopeID] = allScopes[batch.ScopeID]
+	}
+	scopes, err := json.Marshal(usedScopes)
+	if err != nil {
+		return nil, err
+	}
 	var uploadID [16]byte
 	if _, err := rand.Read(uploadID[:]); err != nil {
 		return nil, err
@@ -452,7 +467,7 @@ func Body(f *store.File, batches []store.QueuedBatch) ([]byte, error) {
 	b.WriteString(`,"file":`)
 	b.Write(file)
 	b.WriteString(`,"scopes":`)
-	b.Write(f.Scopes)
+	b.Write(scopes)
 	b.WriteString(`,"batches":[`)
 	for i, x := range batches {
 		if i > 0 {
@@ -665,6 +680,9 @@ func (a *App) envoie(ctx context.Context) error {
 		}
 		return err
 	}
+	// Bound both backlog draining and refusal isolation in one pass. Remaining
+	// batches stay durable and pending; the normal scheduler resumes them.
+	requestsLeft := 32
 	for {
 		f, batches, err := a.Store.Pending(sender.MaxCensusBody - 64<<10)
 		if err != nil {
@@ -674,70 +692,106 @@ func (a *App) envoie(ctx context.Context) error {
 			a.echecs = 0
 			return nil
 		}
-		body, err := Body(f, batches)
-		if err != nil {
+		if err = a.posteCensus(ctx, token, f, batches, &requestsLeft); err != nil {
 			return err
 		}
-		ids := make([]string, len(batches))
-		chars := 0
-		for i, b := range batches {
-			ids[i] = b.BatchID
-			chars += b.Characters
+	}
+}
+
+// posteCensus isolates request failures between complete observations. It never
+// cuts a census observation, changes its counts, or invents fragment identities.
+// Only explicit invalid_body/payload_too_large may reject an individual batch;
+// authorization/source/protocol failures remain global and durable.
+func (a *App) posteCensus(ctx context.Context, token string, f *store.File, batches []store.QueuedBatch, requestsLeft *int) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	split := func() error {
+		middle := len(batches) / 2
+		if err := a.posteCensus(ctx, token, f, batches[:middle], requestsLeft); err != nil {
+			return err
 		}
-		r := a.Sender.Post(ctx, token, body)
-		a.Log.Printf("envoi %d lots (%d personnages, %d Ko) du fichier %s : %s", len(ids), chars, len(body)>>10, f.SHA256[:12], r.Detail)
-		switch r.Verdict {
-		case sender.Accepte:
-			rejet := map[string]string{}
-			for _, x := range r.Reponse.Rejected {
-				rejet[x.BatchID] = x.Reason
-			}
-			var ok []string
-			for _, id := range ids {
-				if reason, bad := rejet[id]; bad {
-					_ = a.Store.MarkRejected([]string{id}, reason)
-					a.Log.Printf("lot %s refusé par le site : %s", id, reason)
-				} else {
-					ok = append(ok, id)
+		return a.posteCensus(ctx, token, f, batches[middle:], requestsLeft)
+	}
+	body, err := Body(f, batches)
+	if err != nil {
+		return err
+	}
+	if len(batches) > 1 && len(body) > sender.MaxCensusBody {
+		return split()
+	}
+	if len(body) > sender.MaxBody {
+		return a.Store.MarkRejected([]string{batches[0].BatchID}, "local_payload_too_large")
+	}
+	ids := make([]string, len(batches))
+	chars := 0
+	for i, b := range batches {
+		ids[i] = b.BatchID
+		chars += b.Characters
+	}
+	if *requestsLeft == 0 {
+		a.prochain = a.Now().Add(sender.Backoff(1))
+		return errors.New(i18n.T("err.census_slice"))
+	}
+	*requestsLeft--
+	r := a.Sender.Post(ctx, token, body)
+	a.Log.Printf("envoi %d lots (%d personnages, %d Ko) du fichier %s : %s", len(ids), chars, len(body)>>10, f.SHA256[:12], r.Detail)
+	switch r.Verdict {
+	case sender.Accepte:
+		rejet := map[string]string{}
+		for _, x := range r.Reponse.Rejected {
+			rejet[x.BatchID] = x.Reason
+		}
+		var ok []string
+		for _, id := range ids {
+			if reason, bad := rejet[id]; bad {
+				if err := a.Store.MarkRejected([]string{id}, reason); err != nil {
+					return err
 				}
+				a.Log.Printf("lot %s refusé par le site : %s", id, reason)
+			} else {
+				ok = append(ok, id)
 			}
-			if err := a.Store.MarkSent(ok); err != nil {
-				return err
-			}
-			a.echecs = 0
-			_ = a.Store.Set("last_send", fmt.Sprintf("%s|%d|%d|%d", a.Now().Format(time.RFC3339), len(ok), chars, r.Status))
-		case sender.Invalide:
-			_ = a.Store.MarkRejected(ids, "http_400")
-			_ = a.Store.Set("blocked_note", fmt.Sprintf("%d lots refusés (400)", len(ids)))
-			_ = a.Store.Set("blocked", BlocCorps)
-			return errors.New(i18n.T("err.400"))
-		case sender.TropGros:
-			if len(ids) == 1 {
-				_ = a.Store.MarkRejected(ids, "http_413")
-				continue
-			}
-			// Ne devrait pas arriver sous 3 Mo : on réessaie lot par lot.
-			a.prochain = a.Now().Add(sender.Backoff(1))
-			return errors.New(i18n.T("err.413"))
-		case sender.JetonRefuse:
-			_ = a.Store.Set("blocked", BlocJeton)
-			return errors.New(i18n.T("err.401"))
-		case sender.SourceCoupee:
-			_ = a.Store.Set("blocked", BlocSource)
-			return errors.New(i18n.T("err.403"))
-		case sender.Incompatible:
-			_ = a.Store.Set("blocked", BlocSchema)
-			return errors.New(i18n.T("err.409"))
-		case sender.Quota:
-			a.prochain = a.Now().Add(r.RetryAfter)
-			return errors.New(i18n.T("err.429", r.RetryAfter.Round(time.Second)))
-		default:
-			a.Store.Attempt(ids)
-			a.echecs++
-			d := sender.Backoff(a.echecs)
-			a.prochain = a.Now().Add(d)
-			return errors.New(i18n.T("err.retry", r.Detail, d.Round(time.Second)))
 		}
+		if err := a.Store.MarkSent(ok); err != nil {
+			return err
+		}
+		a.echecs = 0
+		return a.Store.Set("last_send", fmt.Sprintf("%s|%d|%d|%d", a.Now().Format(time.RFC3339), len(ok), chars, r.Status))
+	case sender.Invalide, sender.TropGros:
+		if len(batches) > 1 {
+			return split()
+		}
+		reason := "http_400"
+		if r.Verdict == sender.TropGros {
+			reason = "http_413"
+		}
+		if err := a.Store.MarkRejected(ids, reason); err != nil {
+			return err
+		}
+		a.Log.Printf("lot %s isolé après refus %s ; autres lots conservés", ids[0], reason)
+		return nil
+	case sender.JetonRefuse:
+		_ = a.Store.Set("blocked", BlocJeton)
+		return errors.New(i18n.T("err.401"))
+	case sender.SourceCoupee:
+		_ = a.Store.Set("blocked", BlocSource)
+		return errors.New(i18n.T("err.403"))
+	case sender.Incompatible:
+		_ = a.Store.Set("blocked", BlocSchema)
+		return errors.New(i18n.T("err.409"))
+	case sender.Quota:
+		a.prochain = a.Now().Add(r.RetryAfter)
+		return errors.New(i18n.T("err.429", r.RetryAfter.Round(time.Second)))
+	default:
+		a.Store.Attempt(ids)
+		a.echecs++
+		d := sender.Backoff(a.echecs)
+		a.prochain = a.Now().Add(d)
+		return errors.New(i18n.T("err.retry", r.Detail, d.Round(time.Second)))
 	}
 }
 
@@ -862,6 +916,10 @@ func (a *App) Etat() Etat {
 			}
 		} else if e.AuctionPending > 0 {
 			e.Couleur, e.Code, e.Message = Orange, "pending", i18n.T("st.auctionpending", e.AuctionPending)
+		} else if e.Rejected > 0 || e.StatsRejected > 0 {
+			// A refused parent is not an upload success. This is a display-only
+			// warning; healthy census batches and independent sheets keep flowing.
+			e.Couleur, e.Code, e.Message = Orange, "rejected", i18n.T("st.rejected", e.Rejected, e.StatsRejected)
 		} else {
 			e.Couleur, e.Code, e.Message = Vert, "allsent", i18n.T("st.allsent")
 		}

@@ -495,8 +495,8 @@ func TestStatsUneFicheRefuseeNeBloquePasLesAutres(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.etat(0, 8, 1)
-	// Les lots ne sont jamais bloqués par un refus de statistiques.
-	if e := b.a.Etat(); e.Couleur != Vert || e.Sent != 1 {
+	// Rejected statistics remain visible, without blocking healthy census data.
+	if e := b.a.Etat(); e.Couleur != Orange || e.Code != "rejected" || e.Sent != 1 || b.st.Get("blocked") != "" {
 		t.Fatalf("état : %+v", e)
 	}
 }

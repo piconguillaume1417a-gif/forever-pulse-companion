@@ -11,7 +11,7 @@ func modeles() []Modele {
 	p := []Portee{{"4619-PVP-Alliance", 51767, "18/09/2026"}, {"4619-PVP-Horde", 12, "21/09/2026"}}
 	var out []Modele
 	out = append(out, Modele{Version: "0.6.0"}) // démarrage
-	for i, code := range []string{"allsent", "pending", "notoken", "token", "schema", "source", "body"} {
+	for i, code := range []string{"allsent", "pending", "notoken", "token", "schema", "source", "body", "rejected"} {
 		m := Modele{Pret: true, Code: code, Message: "message", Couleur: i % 3, Envoyes: 546, Attente: 5,
 			Refuses: 2, DernierEnvoi: "x", Version: "0.6.0", Portees: p[:i%3]}
 		out = append(out, m)

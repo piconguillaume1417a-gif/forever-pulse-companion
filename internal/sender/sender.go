@@ -202,7 +202,7 @@ func (s *Sender) envoie(ctx context.Context, token string, body []byte, route, s
 	r := Resultat{Status: resp.StatusCode}
 	estJSON := jsonDeLaRoute(resp.Header.Get("Content-Type"))
 	if estJSON {
-		_ = decodeJSON(raw, &r.Reponse)
+		estJSON = decodeJSON(raw, &r.Reponse) == nil
 	}
 	switch {
 	case resp.StatusCode == 202 || resp.StatusCode == 200:
@@ -235,6 +235,11 @@ func (s *Sender) envoie(ctx context.Context, token string, body []byte, route, s
 		r.Verdict = Panne
 		r.Detail = fmt.Sprintf("HTTP %d ", resp.StatusCode) + i18n.T("err.notsite")
 		return r
+	case route == Route:
+		// Only a recognized Census refusal can discard data or persist a block.
+		// Unknown/malformed gateway responses remain retryable. Other protocols
+		// keep their existing refusal contracts.
+		r.Verdict = censusRefusal(resp.StatusCode, r.Reponse.Error)
 	case resp.StatusCode == 400:
 		r.Verdict = Invalide
 	case resp.StatusCode == 401:
@@ -253,6 +258,23 @@ func (s *Sender) envoie(ctx context.Context, token string, body []byte, route, s
 		r.Detail += " " + scrub(r.Reponse.Error, token)
 	}
 	return r
+}
+
+func censusRefusal(status int, reason string) Verdict {
+	switch {
+	case status == 400 && reason == "invalid_body":
+		return Invalide
+	case status == 413 && reason == "payload_too_large":
+		return TropGros
+	case status == 400 && reason == "invalid_source", status == 403 && reason == "source_disabled":
+		return SourceCoupee
+	case status == 400 && (reason == "invalid_content_type" || reason == "invalid_encoding"), status == 409 && reason == "unsupported_schema":
+		return Incompatible
+	case (status == 401 || status == 403) && (reason == "token_required" || reason == "token_invalid" || reason == "token_revoked" || reason == "invalid_token"):
+		return JetonRefuse
+	default:
+		return Panne
+	}
 }
 
 // jsonDeLaRoute : la route répond toujours en application/json.
