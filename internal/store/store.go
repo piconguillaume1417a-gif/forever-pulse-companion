@@ -247,6 +247,7 @@ func (s *Store) Pending(limitBytes int) (*File, []QueuedBatch, error) {
 	defer rows.Close()
 	var out []QueuedBatch
 	total := 0
+	seenScopes := map[string]bool{}
 	for rows.Next() {
 		var b QueuedBatch
 		var p string
@@ -255,10 +256,11 @@ func (s *Store) Pending(limitBytes int) (*File, []QueuedBatch, error) {
 			return nil, nil, err
 		}
 		b.Payload = []byte(p)
-		if len(out) > 0 && total+n > limitBytes {
+		if len(out) > 0 && (total+n > limitBytes || len(out) >= 500 || (!seenScopes[b.ScopeID] && len(seenScopes) >= 16)) {
 			break
 		}
 		total += n
+		seenScopes[b.ScopeID] = true
 		out = append(out, b)
 	}
 	return f, out, rows.Err()

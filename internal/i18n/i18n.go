@@ -76,6 +76,7 @@ func Nom(l Lang) string {
 var Toutes = []Lang{FR, EN}
 
 var msgs = map[string][2]string{
+	"err.census_slice":    {"Envoi encore en cours ; les relevés restants seront repris automatiquement.", "Upload still in progress; remaining readings will resume automatically."},
 	"btn.connect":         {"Connecter à Forever Pulse", "Connect to Forever Pulse"},
 	"tip.connect":         {"Ouvre le navigateur pour associer ce PC à votre compte. Aucun jeton à copier.", "Open your browser to connect this PC to your account. No token to copy."},
 	"btn.installations":   {"Gérer les installations", "Manage installations"},
@@ -117,6 +118,7 @@ var msgs = map[string][2]string{
 	"win.more":      {"+ %d autres périmètres", "+ %d more scopes"},
 	"hint.starting": {"Lecture de la base locale et des fichiers de l'addon…", "Reading the local database and the addon files…"},
 	"hint.allsent":  {"Le compagnon surveille ForeverPulse.lua et envoie chaque nouveau relevé tout seul.", "The companion watches ForeverPulse.lua and uploads every new reading on its own."},
+	"hint.rejected": {"Consultez le journal. Les autres relevés continuent de partir.", "Check the log. Other readings continue uploading."},
 	"hint.pending":  {"L'envoi se fait tout seul ; « Envoyer maintenant » le lance sans attendre.", "Uploads happen on their own; “Send now” starts one right away."},
 	"hint.notoken":  {"Cliquez sur « Connecter à Forever Pulse », puis confirmez cette installation dans votre navigateur.", "Click “Connect to Forever Pulse”, then approve this installation in your browser."},
 	"hint.token":    {"L’accès a été refusé ou révoqué. Cliquez sur « Connecter à Forever Pulse » pour vous reconnecter.", "Access was refused or revoked. Click “Connect to Forever Pulse” to reconnect."},
@@ -152,6 +154,7 @@ var msgs = map[string][2]string{
 	"st.retry":        {", nouvel essai à %s", ", next attempt at %s"},
 	"st.statspending": {"%d fiches de statistiques en attente d'envoi", "%d statistics sheets waiting to be sent"},
 	"st.allsent":      {"Tout est envoyé", "Everything has been sent"},
+	"st.rejected":     {"%d lots et %d fiches refusés", "%d batches and %d sheets rejected"},
 	"st.lastsend":     {"Dernier envoi : %s, %s lots, %s personnages", "Last upload: %s, %s batches, %s characters"},
 	"st.cumul":        {"%s : %d personnages distincts observés depuis le %s", "%s: %d distinct characters observed since %s"},
 	"fmt.date":        {"02/01/2006", "Jan 2, 2006"},

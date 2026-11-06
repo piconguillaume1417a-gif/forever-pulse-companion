@@ -393,12 +393,13 @@ func TestRefus401403400EtRejetPartiel(t *testing.T) {
 		t.Fatalf("rejet partiel : %+v", e)
 	}
 
-	// 400 : corps refusé, rien de rangé côté site, lots marqués refusés, rouge.
+	// A singleton invalid_body is rejected without a persistent global block.
+	// The refusal remains visible instead of claiming that everything was sent.
 	b.srv.rejete = ""
 	b.a.ProcessFile(ctx, b.fichier("b.lua", fixture(1, 10, 3)))
 	b.srv.codes = []int{400}
 	_ = b.a.Flush(ctx, false)
-	if e := b.a.Etat(); e.Couleur != Rouge || e.Rejected != 2 || e.Pending != 0 {
+	if e := b.a.Etat(); e.Rejected != 2 || e.Pending != 0 || e.Code == "allsent" || b.st.Get("blocked") != "" {
 		t.Fatalf("400 : %+v", e)
 	}
 }

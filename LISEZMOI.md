@@ -1,5 +1,19 @@
 # Forever Pulse Companion
 
+## Envois Census fiables (0.10.0-rc.8)
+
+Les grands fichiers sont envoyés en plusieurs paquets : au plus 500 lots et 16 périmètres
+utilisés par requête, avec contrôle des octets du corps complet. Chaque relevé reste entier,
+avec ses identifiants, personnages et dates d'origine.
+
+Si le site refuse le contenu d'un paquet, le compagnon réduit le groupe pour isoler le lot
+concerné. Les autres lots et les statistiques continuent. Les pannes temporaires et les réponses
+inconnues restent en attente de reprise ; un lot n'est marqué envoyé qu'après confirmation.
+Les refus restent visibles au lieu d'afficher « Tout est envoyé ».
+
+Les anciens lots déjà refusés restent conservés ; cette mise à jour ne les remet pas automatiquement
+en file. Un scan individuel dépassant les limites du site n'est pas découpé en faux relevés.
+
 ## Base locale allégée (0.10.0)
 
 Le contenu d'un lot de recensement **envoyé depuis plus de 3 jours** est effacé de `companion.db`, deux minutes

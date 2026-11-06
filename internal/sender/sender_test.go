@@ -255,6 +255,8 @@ func TestRefusSeulementDeLaRoute(t *testing.T) {
 		{403, "application/json", `{"error":"source_disabled"}`, SourceCoupee},
 		{409, "application/json", `{"error":"unsupported_schema","supported":[4]}`, Incompatible},
 		{400, "application/json", `{"error":"invalid_body","errors":["x"]}`, Invalide},
+		{400, "application/json", `{"error":"invalid_body"} garbage`, Panne},
+		{400, "application/json", `{"error":"invalid_body","errors":`, Panne},
 		{413, "application/json", `{"error":"payload_too_large","limit_bytes":3145728}`, TropGros},
 		{429, "application/json", `{"error":"rate_limited"}`, Quota},
 		{503, "application/json", `{"error":"unavailable"}`, Panne},
