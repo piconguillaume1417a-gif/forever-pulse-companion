@@ -1,5 +1,13 @@
 # Forever Pulse Companion
 
+## Reprendre une connexion interrompue (0.10.0-rc.9)
+
+Si la page du navigateur a été fermée pendant la connexion, cliquez à nouveau sur
+**Connecter à Forever Pulse** pour rouvrir la même demande et retrouver le même
+code. Cela fonctionne aussi après avoir quitté et relancé le Companion. Le bouton
+reste disponible pendant l'attente de confirmation. Les relevés, les réglages et
+l'autorisation d'envoi existante sont conservés.
+
 ## Envois Census fiables (0.10.0-rc.8)
 
 Les grands fichiers sont envoyés en plusieurs paquets : au plus 500 lots et 16 périmètres

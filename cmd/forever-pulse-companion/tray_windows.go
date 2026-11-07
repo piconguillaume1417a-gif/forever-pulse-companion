@@ -150,7 +150,8 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 	var connectMu sync.Mutex
 	var stopMu sync.Mutex
 	var stopConnect context.CancelFunc
-	connector := &connect.Client{Site: cfg.SiteURL, Vault: vault, SaveToken: a.SetToken, Open: winui.Open,
+	openConnection := make(chan struct{}, 1)
+	connector := &connect.Client{Site: cfg.SiteURL, Vault: vault, SaveToken: a.SetToken, Open: winui.Open, OpenRequests: openConnection,
 		Status: func(state, detail string) {
 			connectionMu.Lock()
 			previous, previousDetail := connectionState, connectionDetail
@@ -175,9 +176,22 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		}}
 	connecter := func(resume bool) {
 		if !connectMu.TryLock() {
+			if !resume {
+				select {
+				case openConnection <- struct{}{}:
+				default:
+				}
+			}
 			return
 		}
 		defer connectMu.Unlock()
+		// Do not carry a click from an expired/cancelled attempt into the next one.
+		defer func() {
+			select {
+			case <-openConnection:
+			default:
+			}
+		}()
 		cctx, stop := context.WithCancel(ctx)
 		stopMu.Lock()
 		stopConnect = stop
@@ -372,7 +386,9 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		case winui.CmdJournal:
 			winui.Open(log.Path())
 		case winui.CmdPage:
-			connecter(false)
+			// The window marks a command busy until it returns. Pairing can take
+			// 15 minutes; keep this button available to reopen the browser.
+			go connecter(false)
 		case winui.CmdEffacer:
 			effacer()
 		case winui.CmdDesinstaller:

@@ -202,3 +202,176 @@ func TestPendingCodeShownBeforeBrowserOpens(t *testing.T) {
 		t.Fatalf("code must be reported before the browser opens, got %v", events)
 	}
 }
+
+// Reproduce closing the browser and app, then clicking Connect while the
+// automatically resumed request is still polling. No new pairing is needed.
+func TestReopenResumedRequest(t *testing.T) {
+	v := &memoryVault{}
+	requests := make(chan struct{}, 1)
+	opened := make(chan string, 4)
+	pending := make(chan string, 4)
+	ops := make(chan string, 8)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		ops <- in["operation"]
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(Result{State: "pending", Code: Code(in["verifier"]), Expires: time.Now().Add(10 * time.Minute), URI: server.URL + "/account/companion/connect?request=" + in["request_id"]})
+	}))
+	defer server.Close()
+	c := Client{Site: server.URL, Vault: v, OpenRequests: requests,
+		Open: func(uri string) { opened <- uri },
+		Status: func(state, detail string) {
+			if state == "pending" {
+				pending <- detail
+			}
+		}}
+	run := func(resume bool) (context.CancelFunc, <-chan error) {
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() {
+			if resume {
+				done <- c.Resume(ctx)
+			} else {
+				done <- c.Start(ctx)
+			}
+		}()
+		t.Cleanup(func() { cancel() })
+		return cancel, done
+	}
+	stop, done := run(false)
+	first := receive(t, opened)
+	code := receive(t, pending)
+	requests <- struct{}{}
+	if got := receive(t, opened); got != first {
+		t.Fatal("reopen before restart changed request URL")
+	}
+	if got := receive(t, pending); got != code {
+		t.Fatal("reopen before restart changed pairing code")
+	}
+	stop()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("shutdown: %v", err)
+	}
+	before, err := c.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop, done = run(true)
+	if got := receive(t, pending); got != code {
+		t.Fatal("pairing code changed on resume")
+	}
+	select {
+	case <-opened:
+		t.Fatal("background resume opened browser")
+	default:
+	}
+	for i := 0; i < 2; i++ {
+		requests <- struct{}{}
+		if got := receive(t, opened); got != first {
+			t.Fatal("reopen changed request URL")
+		}
+	}
+	stop()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("shutdown: %v", err)
+	}
+	after, err := c.load()
+	if err != nil || before.ID != after.ID || before.Verifier != after.Verifier {
+		t.Fatal("reopen replaced persisted request")
+	}
+	if len(ops) != 2 || <-ops != "start" || <-ops != "start" {
+		t.Fatal("reopen must not create extra HTTP traffic")
+	}
+}
+
+func receive(t *testing.T, ch <-chan string) string {
+	t.Helper()
+	select {
+	case value := <-ch:
+		return value
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for connection event")
+		return ""
+	}
+}
+
+func TestQueuedReopenRequiresValidatedPendingRequest(t *testing.T) {
+	for _, state := range []string{"pending", "invalid_uri", "expired", "completed"} {
+		t.Run(state, func(t *testing.T) {
+			v := &memoryVault{}
+			requests := make(chan struct{}, 1)
+			requests <- struct{}{} // Click before the resumed start response arrives.
+			r := Record{ID: "17000000-0000-4000-8000-000000000001", Verifier: strings.Repeat("A", 43), Expires: time.Now().Add(time.Minute), Completed: state == "completed", Account: "SYNTHETIC"}
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				out := Result{State: "pending", Code: Code(r.Verifier), Expires: r.Expires, URI: server.URL + "/account/companion/connect?request=" + r.ID}
+				switch state {
+				case "invalid_uri":
+					out.URI = "https://example.invalid/"
+				case "expired":
+					out = Result{Error: "expired_token"}
+				case "completed":
+					out = Result{State: "acknowledged"}
+				}
+				_ = json.NewEncoder(w).Encode(out)
+			}))
+			defer server.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			opens := 0
+			c := Client{Site: server.URL, Vault: v, OpenRequests: requests, Open: func(uri string) {
+				opens++
+				if uri != server.URL+"/account/companion/connect?request="+r.ID {
+					t.Error("unexpected browser destination")
+				}
+				cancel()
+			}}
+			if err := c.save(r); err != nil {
+				t.Fatal(err)
+			}
+			err := c.Resume(ctx)
+			if state == "pending" {
+				if opens != 1 || !errors.Is(err, context.Canceled) {
+					t.Fatalf("queued click lost: opens=%d, err=%v", opens, err)
+				}
+			} else if opens != 0 {
+				t.Fatal("opened a non-pending or unvalidated request")
+			}
+		})
+	}
+}
+
+func TestReopeningDoesNotResetPollTimer(t *testing.T) {
+	requests := make(chan struct{}, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	clicksDone := make(chan struct{})
+	go func() {
+		defer close(clicksDone)
+		ticker := time.NewTicker(time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				select {
+				case requests <- struct{}{}:
+				default:
+				}
+			}
+		}
+	}()
+	opens := 0
+	if !wait(ctx, 50*time.Millisecond, requests, func() { opens++ }) {
+		t.Error("clicks postponed polling until timeout")
+	}
+	cancel()
+	<-clicksDone
+	if opens == 0 {
+		t.Fatal("no clicks handled during poll wait")
+	}
+}
