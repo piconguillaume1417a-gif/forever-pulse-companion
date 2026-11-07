@@ -17,6 +17,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"wowsync/internal/config"
 	"wowsync/internal/connect"
 	"wowsync/internal/cumul"
+	"wowsync/internal/guilds"
 	"wowsync/internal/logx"
 	"wowsync/internal/schema"
 	"wowsync/internal/secret"
@@ -385,6 +387,31 @@ func runDry(dataDir string, args []string, out string) error {
 		_ = st.MarkStats(sheets, "sent", "") // base temporaire
 	}
 	fmt.Printf("%d requêtes de statistiques construites, aucune postée\n", ns)
+	for ng := 1; ; ng++ {
+		g, err := st.GuildPending()
+		if err != nil {
+			return err
+		}
+		if g == nil {
+			break
+		}
+		payload, err := json.Marshal(guilds.Body{Schema: 1, Companion: app.Version, Snapshots: []guilds.Snapshot{*g}})
+		if err != nil {
+			return err
+		}
+		fmt.Printf("requête de guilde %d : %d membres, %d en ligne, %d octets, aucune postée\n", ng, g.Total, g.Online, len(payload))
+		if out != "" {
+			if err := os.MkdirAll(out, 0700); err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(out, fmt.Sprintf("guilde-%02d.json", ng)), payload, 0600); err != nil {
+				return err
+			}
+		}
+		if err := st.MarkGuild(g, "sent", ""); err != nil {
+			return err
+		}
+	}
 	if err := dryAuctions(st, out); err != nil {
 		return err
 	}

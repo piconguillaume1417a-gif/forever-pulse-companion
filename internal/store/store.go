@@ -88,7 +88,7 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schemaSQL + auctionsSQL); err != nil {
+	if _, err := db.Exec(schemaSQL + auctionsSQL + guildSQL); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (s *Store) Wipe() error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, t := range []string{"auctions_parts", "auctions_markets", "auctions_queue", "auctions_files", "queue", "files", "stats_queue", "stats_files", "cumul_lots", "cumul_scopes", "cumul_persos", "cumul_noms", "meta"} {
+	for _, t := range []string{"guild_queue", "guild_files", "auctions_parts", "auctions_markets", "auctions_queue", "auctions_files", "queue", "files", "stats_queue", "stats_files", "cumul_lots", "cumul_scopes", "cumul_persos", "cumul_noms", "meta"} {
 		if _, err := tx.Exec("delete from " + t); err != nil {
 			return err
 		}
