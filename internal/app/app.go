@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"wowsync/internal/cumul"
+	"wowsync/internal/guilds"
 	"wowsync/internal/i18n"
 	"wowsync/internal/logx"
 	"wowsync/internal/lua"
@@ -36,7 +37,7 @@ import (
 )
 
 const (
-	Version = "0.10.0-rc.9"
+	Version = "0.10.0-rc.10"
 	Nom     = "forever-pulse-companion"
 )
 
@@ -69,6 +70,9 @@ type Etat struct {
 	Portees      []Portee // le même cumul, en champs séparés (fenêtre)
 
 	// 0.7.0 : statistiques de personnages et détail de l'état.
+	GuildPending    int
+	GuildSent       int
+	GuildRejected   int
 	StatsPending    int
 	StatsSent       int
 	StatsRejected   int
@@ -102,6 +106,8 @@ type App struct {
 	// jamais l'envoi des lots.
 	echecsStats   int
 	prochainStats time.Time
+	prochainGuild time.Time
+	echecsGuild   int
 
 	// 0.6.0 : résumé du cumul gardé entre deux lectures de l'état. Il ne change
 	// qu'avec le cumul (nouveau fichier, effacement) ou la langue.
@@ -143,17 +149,22 @@ func Decode(data []byte, now time.Time) (*schema.Fichier, *lua.Table, error) {
 // DecodeTout lit un fichier en mémoire et l'analyse. ForeverPulseCensusDB et
 // ForeverPulseStatsDB sont construits ; ForeverPulseScanDB (l'état interne de
 // l'addon) est vérifié syntaxiquement puis oublié : il n'est jamais lu ni transmis.
+// Le pipeline de fichier lit aussi ForeverPulseGuildDB, dans sa file distincte.
 // Le fichier est analysé comme des données, sans interpréteur Lua.
 func DecodeTout(data []byte, now time.Time) (*schema.Fichier, *lua.Table, *stats.Fichier, error) {
-	v, err := lua.Parse(data, map[string]bool{"ForeverPulseCensusDB": true, stats.Variable: true})
+	f, db, sf, _, err := decodeWithGuild(data, now)
+	return f, db, sf, err
+}
+func decodeWithGuild(data []byte, now time.Time) (*schema.Fichier, *lua.Table, *stats.Fichier, *lua.Table, error) {
+	v, err := lua.Parse(data, map[string]bool{"ForeverPulseCensusDB": true, stats.Variable: true, guilds.Variable: true})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	db := lua.AsTable(v["ForeverPulseCensusDB"])
 	if db == nil {
-		return nil, nil, nil, errors.New("ForeverPulseCensusDB absent du fichier")
+		return nil, nil, nil, nil, errors.New("ForeverPulseCensusDB absent du fichier")
 	}
-	return schema.Analyse(db, now), db, stats.DecodeAt(lua.AsTable(v[stats.Variable]), now), nil
+	return schema.Analyse(db, now), db, stats.DecodeAt(lua.AsTable(v[stats.Variable]), now), lua.AsTable(v[guilds.Variable]), nil
 }
 
 // CumulLots : les lots d'un fichier dans la forme que lit le cumul. Même règle que
@@ -237,7 +248,8 @@ func (a *App) ProcessFile(ctx context.Context, path string) (int, error) {
 	}
 	short := sha[:12]
 	lotsConnus, statsConnues := a.Store.FileKnown(sha), a.Store.StatsFileKnown(sha)
-	if lotsConnus && statsConnues {
+	guildKnown := a.Store.GuildFileKnown(sha)
+	if lotsConnus && statsConnues && guildKnown {
 		a.Log.Printf("fichier %s (%s) déjà traité, ignoré", filepath.Base(path), short)
 		return 0, nil
 	}
@@ -245,7 +257,7 @@ func (a *App) ProcessFile(ctx context.Context, path string) (int, error) {
 	// décodage ; ils sont rendus à Windows dès la fin du traitement, sans attendre
 	// le ramasse-miettes (le compagnon reste léger en fond).
 	defer debug.FreeOSMemory()
-	f, db, sf, err := DecodeTout(data, a.Now())
+	f, db, sf, gf, err := decodeWithGuild(data, a.Now())
 	if err != nil {
 		a.Log.Printf("fichier %s (%s) illisible : %s", filepath.Base(path), short, strings.SplitN(err.Error(), "—", 2)[0])
 		return 0, err
@@ -256,6 +268,19 @@ func (a *App) ProcessFile(ctx context.Context, path string) (int, error) {
 			a.Log.Printf("fichier %s (%s) refusé : %s", filepath.Base(path), short, e)
 		}
 		return 0, fmt.Errorf("fichier refusé (%d défauts)", len(f.Fatales))
+	}
+	if !guildKnown {
+		g, ge := guilds.Decode(gf, lua.AsTable(db.Get("scopes")), a.Now())
+		if ge != nil {
+			a.Log.Printf("guild roster rejected: invalid or incomplete snapshot")
+			_ = a.Store.Set("guild_note", "invalid_snapshot")
+		}
+		if ge == nil {
+			_ = a.Store.Set("guild_note", "")
+		}
+		if err := a.Store.AddGuild(ctx, sha, g); err != nil {
+			return 0, err
+		}
 	}
 	if lotsConnus {
 		// Fichier déjà traité par une version antérieure à la 0.7.0 : seules ses
@@ -492,6 +517,15 @@ func (a *App) Flush(ctx context.Context, manual bool) error {
 	a.mu.Lock()
 	rien, err := a.flush(ctx, manual)
 	if a.Sender != nil {
+		if err == nil {
+			attempted, ge := a.envoieGuild(ctx, manual)
+			if attempted {
+				rien = false
+			}
+			if ge != nil {
+				err = ge
+			}
+		}
 		attempted, ae := a.envoieAuctions(ctx, manual)
 		if attempted {
 			rien = false
@@ -879,11 +913,13 @@ func (a *App) Etat() Etat {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	c := a.Store.Counts()
+	gc := a.Store.GuildCounts()
 	sc := a.Store.StatsCounts()
 	ac := a.Store.AuctionCounts()
 	ad := a.Store.AuctionDayCounts()
 	e := Etat{Pending: c["pending"], Sent: c["sent"], Rejected: c["rejected"],
 		StatsPending: sc["pending"], StatsSent: sc["sent"], StatsRejected: sc["rejected"]}
+	e.GuildPending, e.GuildSent, e.GuildRejected = gc["pending"], gc["sent"], gc["rejected"]
 	e.AuctionPending, e.AuctionSent, e.AuctionUnproven = ac["pending"], ac["sent"], ad["jours_sans_faction_prouvee"]
 	switch a.Store.Get("blocked") {
 	case BlocSchema:
@@ -914,6 +950,13 @@ func (a *App) Etat() Etat {
 			if a.Now().Before(a.prochainStats) {
 				e.Message += i18n.T("st.retry", a.prochainStats.Format(i18n.T("fmt.time")))
 			}
+		} else if e.GuildPending > 0 {
+			e.Couleur, e.Code, e.Message = Orange, "pending", i18n.T("st.guildpending", e.GuildPending)
+			if a.Store.Get("guild_blocked") != "" {
+				e.Message = i18n.T("st.guildblocked")
+			}
+		} else if e.GuildRejected > 0 || a.Store.Get("guild_note") != "" {
+			e.Couleur, e.Code, e.Message = Orange, "rejected", i18n.T("st.guildrejected")
 		} else if e.AuctionPending > 0 {
 			e.Couleur, e.Code, e.Message = Orange, "pending", i18n.T("st.auctionpending", e.AuctionPending)
 		} else if e.Rejected > 0 || e.StatsRejected > 0 {
@@ -970,6 +1013,12 @@ func (a *App) details(e Etat) []string {
 		out = append(out, i18n.T("det.nostatssent"))
 	}
 	out = append(out, i18n.T("det.pending", e.Pending, e.StatsPending))
+	out = append(out, i18n.T("det.guild", e.GuildPending, e.GuildSent, e.GuildRejected))
+	for _, k := range []string{"guild_note", "guild_blocked"} {
+		if note := a.Store.Get(k); note != "" {
+			out = append(out, i18n.T("det.guildnote", note))
+		}
+	}
 	out = append(out, i18n.T("det.stats", e.StatsSent, e.StatsRejected))
 	switch a.Store.Get("stats_blocked") {
 	case BlocSource:

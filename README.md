@@ -166,3 +166,16 @@ The window only exists while it is open: closing it frees everything it uses, an
 Since 0.4.0 the companion also reads the compact format written by addon 3.7.0 (schema 5: shared dictionaries, coded `/who` batches, channel deltas). It expands it before any check, so what reaches the website is exactly what the same capture would have produced in the previous format (schema 4).
 
 Since 0.5.0 it also reads schema 6 (addon 3.7.1), where names are stored once in a shared table and rows only carry their number. It is expanded to schema 4 before upload as well.
+
+## Guild roster uploads (0.10.0-rc.10 candidate)
+
+Addon 4.6.2-test.3 exports a complete hourly guild snapshot in ForeverPulseGuildDB.
+The Companion validates all rows, stores the latest snapshot per region/scope/guild,
+and sends it after census and statistics to /api/ingest/guild-roster (schema 1).
+Online, offline and unknown states are retained at the snapshot date; membership
+never becomes a census sighting. No notes, ranks or officer data are transmitted.
+A network failure keeps the snapshot pending, an exact JSON receipt confirms it,
+and an older backup never replaces it. The Details panel reports guild counts.
+The website requires the corresponding SQL candidate and endpoint deployment.
+--dry-run includes guild requests and performs no upload. This candidate is not
+claimed published or installed by this document.
