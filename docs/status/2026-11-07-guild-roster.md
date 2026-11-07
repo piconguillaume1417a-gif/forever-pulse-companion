@@ -20,3 +20,9 @@ Synthetic tests cover offline/unknown, incomplete rows, duplicate identities,
 future time, reordered rows, restart, stale backup/ack, newer replacement, wipe,
 HTTP outage/retry, sequential ordering and unchanged file reread. No real data
 or credentials are included. The site must be deployed before real uploads.
+
+CI 42420775759 executed vet and all tests successfully, then caught a stale Windows
+version resource (mkres invoked without its required version argument). Regenerated
+with explicit 0.10.0-rc.10; rebuilt EXE reports this version in both CLI and PE
+resource. Snapshot-order test also reuses one timestamp to avoid a second-boundary
+flake. No candidate was installed or published from the failed CI.

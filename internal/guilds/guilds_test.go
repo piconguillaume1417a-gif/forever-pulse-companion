@@ -20,14 +20,14 @@ func parse(t *testing.T, m tl.M) (*Snapshot, error) {
 	return Decode(lua.AsTable(d["G"]), lua.AsTable(d["S"]), time.Now())
 }
 func TestSnapshot(t *testing.T) {
-	s, e := parse(t, fixture())
+	m := fixture()
+	s, e := parse(t, m)
 	if e != nil {
 		t.Fatal(e)
 	}
 	if len(s.Members) != 3 || *s.Members[1].Online || s.Members[2].Online != nil {
 		t.Fatal("presence lost")
 	}
-	m := fixture()
 	rows := strings.Split(m["blocs"].(tl.L)[0].(string), "\n")
 	m["blocs"] = tl.L{rows[2] + "\n" + rows[0] + "\n" + rows[1]}
 	r, e := parse(t, m)
