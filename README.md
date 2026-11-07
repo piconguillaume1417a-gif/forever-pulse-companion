@@ -4,7 +4,12 @@ Windows companion of the **Forever Pulse** addon for *World of Warcraft: Forever
 the SavedVariables written by the addon and uploads them to https://forever-pulse.com.
 It never touches the game. Full guide in French: [LISEZMOI.md](LISEZMOI.md).
 
-Version 0.10.0-rc.8 fixes Census delivery for large backlogs: requests contain at most
+Version 0.10.0-rc.9 fixes the Connect button after closing the browser or restarting
+the Companion during account approval. Click Connect again to reopen the same
+approval page and code. The button remains available while approval is pending;
+existing readings, settings and upload credentials are preserved.
+
+Version 0.10.0-rc.8 fixed Census delivery for large backlogs: requests contain at most
 500 batches and 16 referenced scopes, with byte limits checked on the full request.
 A rejected request is narrowed down to the affected whole batch; other valid batches
 continue. Temporary or unknown failures keep data pending, and rejected data stays

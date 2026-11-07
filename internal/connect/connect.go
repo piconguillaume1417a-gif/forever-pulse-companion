@@ -52,6 +52,9 @@ type Client struct {
 	SaveToken func(string) error
 	Open      func(string)
 	Status    func(state, detail string)
+	// OpenRequests asks the active attempt to reopen its validated browser page.
+	// The UI sends on a buffered channel; it must not close it during an attempt.
+	OpenRequests <-chan struct{}
 }
 
 func (c *Client) report(state, detail string) {
@@ -177,14 +180,24 @@ func (c *Client) Cancel(ctx context.Context) error {
 	c.report("cancelled", "")
 	return nil
 }
-func wait(ctx context.Context, d time.Duration) bool {
+func wait(ctx context.Context, d time.Duration, requests <-chan struct{}, reopen func()) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return false
-	case <-t.C:
-		return true
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			return true
+		case _, ok := <-requests:
+			if !ok {
+				requests = nil
+				continue
+			}
+			if ctx.Err() == nil {
+				reopen()
+			}
+		}
 	}
 }
 func (c *Client) run(ctx context.Context, r Record, open bool) error {
@@ -192,6 +205,20 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 	defer cancel()
 	interval := 5 * time.Second
 	started := false
+	validatedURI := ""
+	reopen := func() {
+		if r.Completed || !time.Now().Before(r.Expires) {
+			return
+		}
+		if validatedURI == "" {
+			open = true // A click during a network failure waits for validation.
+			return
+		}
+		c.report("pending", Code(r.Verifier))
+		if c.Open != nil {
+			c.Open(validatedURI)
+		}
+	}
 	for time.Now().Before(r.Expires) {
 		if ctx.Err() != nil {
 			if !time.Now().Before(r.Expires) {
@@ -209,7 +236,7 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 		out, e := c.call(ctx, r, op)
 		if e != nil {
 			c.report(e.Error(), "")
-			if !wait(ctx, interval) {
+			if !wait(ctx, interval, c.OpenRequests, reopen) {
 				if !time.Now().Before(r.Expires) {
 					break
 				}
@@ -251,6 +278,7 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 					return errors.New("vault")
 				}
 				started = true
+				validatedURI = expected
 				// The code is on screen before the browser takes the focus, so the
 				// holder can compare it with the page as soon as the page appears.
 				c.report("pending", out.Code)
@@ -284,7 +312,7 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 		default:
 			return errors.New("network")
 		}
-		if !wait(ctx, interval) {
+		if !wait(ctx, interval, c.OpenRequests, reopen) {
 			if time.Now().After(r.Expires) {
 				break
 			}
