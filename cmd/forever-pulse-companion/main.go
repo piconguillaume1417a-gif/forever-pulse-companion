@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"sort"
 	"time"
 
 	"wowsync/internal/app"
@@ -127,81 +126,39 @@ func runOnce(path string) error {
 		fmt.Println("rien envoyé")
 		return err
 	}
-	data, sha, err := watch.Read(path)
-	if err != nil {
-		return err
-	}
 	start := time.Now()
-	f, db, sf, err := app.DecodeTout(data, time.Now())
+	dir, err := os.MkdirTemp("", "forever-pulse-audit-")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s\n  %d octets, SHA-256 %s, décodé en %s\n", path, len(data), sha, time.Since(start).Round(time.Millisecond))
-	fmt.Printf("  schéma %d, addon %s, session d'observation %s\n", f.Schema, f.AddonVersion, f.ObserverID)
-	for _, l := range f.Infos {
-		fmt.Println("  " + l)
+	defer os.RemoveAll(dir)
+	st, err := store.Open(filepath.Join(dir, "audit.db"))
+	if err != nil {
+		return err
 	}
-	for _, a := range f.Avertis {
-		fmt.Println("  ⚠  " + a)
+	defer st.Close()
+	log, err := logx.Open(filepath.Join(dir, "audit.log"))
+	if err != nil {
+		return err
 	}
-	for _, e := range f.Fatales {
-		fmt.Println("  ✗  " + e)
+	defer log.Close()
+	a, err := app.New(st, log, nil)
+	if err != nil {
+		return err
 	}
-	ok, chars, zc := 0, 0, 0
-	for _, l := range f.Lots {
-		etat := "ok"
-		if !l.Valide() {
-			etat = "ÉCARTÉ"
-		} else {
-			ok++
-			chars += l.Personnages
-			if l.Payload.Get("zone_count") != nil {
-				zc++
-			}
-		}
-		src := l.SourceScope
-		if src == "" && l.Method == "channel_roster" {
-			src = "zone"
-		}
-		fmt.Printf("  lot %2d %-14s %-13s %-5s %5d personnages  %s\n", l.Index, l.Method, src, l.Kind, l.Personnages, etat)
-		for _, a := range l.Avertis {
-			fmt.Println("         ⚠  " + a)
-		}
-		for _, e := range l.Erreurs {
-			fmt.Println("         ✗  " + e)
-		}
+	added, err := a.ProcessFile(context.Background(), path)
+	if err != nil {
+		return err
 	}
-	fmt.Printf("  %d lots, %d envoyables (%d avec zone_count), %d lignes de personnages\n", len(f.Lots), ok, zc, chars)
-	c := cumul.Nouveau()
-	c.Integrer(app.CumulLots(db))
-	res := c.Resume(time.Now().Unix())
-	ids := make([]string, 0, len(res))
-	for k := range res {
-		ids = append(ids, k)
+	fmt.Printf("%s\n  %d lots, %d fiches statistiques, %s\n", path, added, st.StatsCounts()["pending"], time.Since(start).Round(time.Millisecond))
+	scopes, err := st.ResumeCumul()
+	if err != nil {
+		return err
 	}
-	sort.Strings(ids)
-	for _, sid := range ids {
-		r := res[sid]
-		fmt.Printf("  [%s] personnages distincts observés dans ce fichier : %d (avec GUID %d, vus seulement par /who %d)\n",
-			sid, r.Total, r.AvecGUID, r.SeulementWho)
-	}
-	if sf != nil && sf.Present {
-		for _, l := range sf.Infos {
-			fmt.Println("  " + l)
-		}
-		for _, l := range sf.Ecartees {
-			fmt.Println("  ⚠  statistiques : " + l)
-		}
-		for _, l := range sf.Fatales {
-			fmt.Println("  ✗  statistiques : " + l)
-		}
-	} else {
-		fmt.Println("  statistiques : variable ForeverPulseStatsDB absente du fichier")
+	for _, s := range scopes {
+		fmt.Printf("  [%s] %d personnages distincts connus\n", s.ScopeID, s.Total)
 	}
 	fmt.Println("  rien n'a été envoyé")
-	if len(f.Fatales) > 0 {
-		return fmt.Errorf("fichier refusé")
-	}
 	return nil
 }
 
@@ -236,7 +193,7 @@ func runDump(paths []string) error {
 	c := cumul.Nouveau()
 	var fichiers []any
 	for _, p := range paths {
-		data, sha, err := watch.Read(p)
+		data, sha, err := watch.ReadSmall(p)
 		if err != nil {
 			return err
 		}

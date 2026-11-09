@@ -27,6 +27,7 @@ const (
 	SrcCanal = "canal"
 	SrcMonde = "monde"
 	SrcWho   = "who"
+	SrcGuild = "guild_membership"
 
 	JoursActifs = 30
 )
@@ -138,11 +139,12 @@ type Portee struct {
 
 // Obs : une observation d'un personnage.
 type Obs struct {
-	GUID        string // vide pour le /who
-	DisplayName string
-	Vals        map[string]any // class, race, level, class_loc, race_loc, zone
-	Guild       *string        // seul le /who la donne ; "" = « sans guilde », une mesure
-	Source      string
+	GUID           string // vide pour le /who
+	DisplayName    string
+	Vals           map[string]any // class, race, level, class_loc, race_loc, zone
+	Guild          *string        // seul le /who la donne ; "" = « sans guilde », une mesure
+	Source         string
+	MembershipOnly bool
 }
 
 // Stats : compteurs d'une intégration (mêmes noms que la référence).
@@ -224,10 +226,10 @@ func vide(v any) bool {
 }
 
 func maj(e *Entree, o Obs, t int64) {
-	if e.Premier == nil || t < *e.Premier {
+	if !o.MembershipOnly && (e.Premier == nil || t < *e.Premier) {
 		e.Premier = &t
 	}
-	if e.Dernier == nil || t > *e.Dernier {
+	if !o.MembershipOnly && (e.Dernier == nil || t > *e.Dernier) {
 		tt := t
 		e.Dernier = &tt
 	}
@@ -239,12 +241,12 @@ func maj(e *Entree, o Obs, t int64) {
 		if vide(v) {
 			continue
 		}
-		if t >= e.t(champ) {
+		if t > e.t(champ) || (t == e.t(champ) && o.Source != SrcGuild) {
 			e.Vals[champ] = v
 			e.Ts[champ] = t
 		}
 	}
-	if o.Guild != nil && t >= e.t("guild") {
+	if o.Guild != nil && (t > e.t("guild") || (t == e.t("guild") && o.Source != SrcGuild)) {
 		e.Vals["guild"] = *o.Guild
 		e.Ts["guild"] = t
 	}
@@ -252,7 +254,7 @@ func maj(e *Entree, o Obs, t int64) {
 	if e.NomT != nil {
 		nt = *e.NomT
 	}
-	if o.DisplayName != "" && t >= nt {
+	if o.DisplayName != "" && (t > nt || (t == nt && o.Source != SrcGuild)) {
 		dn := o.DisplayName
 		e.DisplayName = &dn
 		tt := t
@@ -297,7 +299,7 @@ func (c *Cumul) Observer(sid string, o Obs, t int64, st *Stats) {
 			p.Persos[guid] = e
 			st.Nouveaux++
 		}
-		if e.DisplayName != nil && *e.DisplayName != "" {
+		if e.DisplayName != nil && *e.DisplayName != "" && (e.NomT == nil || t > *e.NomT || (t == *e.NomT && o.Source != SrcGuild)) {
 			ka := CleNom(*e.DisplayName)
 			if ka != kn && p.Noms[ka] == guid {
 				delete(p.Noms, ka) // renommage : l'ancien nom ne pointe plus ici
@@ -317,7 +319,7 @@ func (c *Cumul) Observer(sid string, o Obs, t int64, st *Stats) {
 				st.NomsRepris++ // nom repris par un autre GUID
 			}
 		}
-		if kn != "" {
+		if kn != "" && (e.NomT == nil || t > *e.NomT || kn == CleNom(*e.DisplayName)) && (o.Source != SrcGuild || p.Noms[kn] == "" || p.Noms[kn] == guid || strings.HasPrefix(p.Noms[kn], "nom:")) {
 			p.Noms[kn] = guid
 			nomSale(kn)
 		}
@@ -362,6 +364,8 @@ type RosterPerso struct {
 	GUID, DisplayName, Class, Race string
 	Level                          *int
 	Zone                           *string
+	Guild                          *string
+	MembershipOnly                 bool
 }
 
 type WhoPerso struct {
@@ -406,7 +410,16 @@ func (c *Cumul) Integrer(lots []Lot) Stats {
 		}
 		p := c.portee(sid)
 		t := l.ObservedAt
-		if p.Depuis == nil || t < *p.Depuis {
+		presence := l.Source != SrcGuild
+		if !presence {
+			for _, member := range l.Roster {
+				if !member.MembershipOnly {
+					presence = true
+					break
+				}
+			}
+		}
+		if presence && (p.Depuis == nil || t < *p.Depuis) {
 			tt := t
 			p.Depuis = &tt
 			c.scopesSal[sid] = true
@@ -424,7 +437,7 @@ func (c *Cumul) Integrer(lots []Lot) Stats {
 				if r.Zone != nil {
 					zone = *r.Zone
 				}
-				c.Observer(sid, Obs{GUID: r.GUID, DisplayName: r.DisplayName, Source: l.Source, Vals: map[string]any{
+				c.Observer(sid, Obs{GUID: r.GUID, DisplayName: r.DisplayName, Source: l.Source, Guild: r.Guild, MembershipOnly: r.MembershipOnly, Vals: map[string]any{
 					"class": r.Class, "race": r.Race, "level": lvl(r.Level), "zone": zone}}, t, &st)
 				st.Observations++
 			}

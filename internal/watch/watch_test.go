@@ -49,7 +49,7 @@ func TestStableApres3s(t *testing.T) {
 	if len(w.Ready([]string{p}, t0.Add(11*time.Second))) != 0 || len(w.Ready([]string{p}, t0.Add(14*time.Second))) != 1 {
 		t.Fatal("réécriture non détectée")
 	}
-	data, sha, err := Read(p)
+	data, sha, err := ReadSmall(p)
 	if err != nil || string(data) != "ab" || len(sha) != 64 {
 		t.Fatal(err)
 	}

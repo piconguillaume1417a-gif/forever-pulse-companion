@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-const MaxFile = 64 << 20 // l'addon plafonne à 50 Mo de lignes
+const maxWholeValue = 64 << 20 // ancien dump de diagnostic et base Auctionator
 
 // Discover renvoie les ForeverPulse.lua et .bak existants sous le dossier WoW.
 func Discover(wowDir string) []string {
@@ -87,19 +87,19 @@ func escape(p string) string {
 	return string(r)
 }
 
-// Read lit tout le fichier en mémoire, partagé, puis referme aussitôt.
-func Read(path string) ([]byte, string, error) {
+// ReadSmall is for legacy diagnostic dumps and Auctionator only. Census SavedVariables use OpenSnapshot.
+func ReadSmall(path string) ([]byte, string, error) {
 	f, err := openShared(path)
 	if err != nil {
 		return nil, "", err
 	}
 	defer f.Close()
-	data, err := io.ReadAll(io.LimitReader(f, MaxFile+1))
+	data, err := io.ReadAll(io.LimitReader(f, maxWholeValue+1))
 	if err != nil {
 		return nil, "", err
 	}
-	if len(data) > MaxFile {
-		return nil, "", fmt.Errorf("fichier de plus de %d Mo", MaxFile>>20)
+	if len(data) > maxWholeValue {
+		return nil, "", fmt.Errorf("fichier de plus de %d Mo", maxWholeValue>>20)
 	}
 	sum := sha256.Sum256(data)
 	return data, hex.EncodeToString(sum[:]), nil

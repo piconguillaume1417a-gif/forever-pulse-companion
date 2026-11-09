@@ -181,6 +181,15 @@ func niveauOK(p *int) bool { return p == nil || (*p >= 1 && *p <= 100) }
 // Analyse valide un ForeverPulseCensusDB et prépare les corps d'envoi.
 // `maintenant` sert au contrôle « au plus 5 minutes dans le futur » du site.
 func Analyse(db *lua.Table, maintenant time.Time) *Fichier {
+	return analyseFile(db, maintenant, nil)
+}
+
+// AnalysePrepared validates one already developed chain, oldest first.
+func AnalysePrepared(db *lua.Table, maintenant time.Time, lots []*lua.Table) *Fichier {
+	return analyseFile(db, maintenant, lots)
+}
+
+func analyseFile(db *lua.Table, maintenant time.Time, lots []*lua.Table) *Fichier {
 	f := &Fichier{Scopes: map[string]any{}}
 	if db == nil {
 		f.Fatales = append(f.Fatales, "ni ForeverPulseCensusDB dans ce fichier")
@@ -239,9 +248,14 @@ func Analyse(db *lua.Table, maintenant time.Time) *Fichier {
 		}
 	}
 
-	lots, devErrs := DevelopperLots(db)
+	var devErrs map[int]error
+	if lots == nil {
+		lots, devErrs = DevelopperLots(db)
+	}
 	if len(lots) == 0 {
-		f.Fatales = append(f.Fatales, "aucun lot")
+		if lots == nil {
+			f.Fatales = append(f.Fatales, "aucun lot")
+		}
 		return f
 	}
 

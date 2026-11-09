@@ -41,7 +41,7 @@ func DecodeAuctionFile(path string, now time.Time) (auctions.Result, int64, erro
 	if e != nil {
 		return r, 0, errors.New("fichier Auctionator inaccessible")
 	}
-	data, sha, e := watch.Read(path)
+	data, sha, e := watch.ReadSmall(path)
 	if e != nil {
 		return r, 0, errors.New("lecture Auctionator impossible")
 	}
@@ -50,16 +50,38 @@ func DecodeAuctionFile(path string, now time.Time) (auctions.Result, int64, erro
 	var catalog *auctions.Catalog
 	addon := ""
 	nb, ne := os.Stat(notePath)
-	note, _, e := watch.Read(notePath)
+	note, stable, e := watch.OpenSnapshot(notePath)
 	if e == nil {
-		v, e := lua.Parse(note, map[string]bool{"ForeverPulseCensusDB": true, "ForeverPulseStatsDB": true})
-		if e != nil {
-			return r, 0, errors.New("note Forever Pulse illisible")
+		defer note.Close()
+		wanted := map[string]map[string]lua.Span{
+			censusVar:             {"hdv": {}, "addon": {}},
+			"ForeverPulseStatsDB": {"objets": {}},
 		}
-		census := lua.AsTable(v["ForeverPulseCensusDB"])
-		hdv = lua.AsTable(census.Get("hdv"))
-		addon = lua.Str(lua.AsTable(census.Get("addon")).Get("version"))
-		catalog = auctions.ReadCatalog(lua.AsTable(lua.AsTable(v["ForeverPulseStatsDB"]).Get("objets")))
+		e = lua.Index(context.Background(), note, map[string]bool{censusVar: true, "ForeverPulseStatsDB": true}, func(path []lua.Key, span lua.Span) error {
+			if len(path) == 2 {
+				if fields := wanted[path[0].Name]; fields != nil {
+					if _, ok := fields[path[1].Name]; ok {
+						fields[path[1].Name] = span
+					}
+				}
+			}
+			return nil
+		})
+		field := func(root, key string) *lua.Table {
+			span := wanted[root][key]
+			if e != nil || span.End == 0 {
+				return nil
+			}
+			var v any
+			v, e = span.Value(note, maxHeaderValue)
+			return lua.AsTable(v)
+		}
+		hdv = field(censusVar, "hdv")
+		addon = lua.Str(field(censusVar, "addon").Get("version"))
+		catalog = auctions.ReadCatalog(field("ForeverPulseStatsDB", "objets"))
+		if e != nil || stable() != nil {
+			return r, 0, errors.New("note Forever Pulse illisible ou en cours d'écriture")
+		}
 	} else if !os.IsNotExist(e) {
 		return r, 0, errors.New("lecture de la note impossible")
 	}
