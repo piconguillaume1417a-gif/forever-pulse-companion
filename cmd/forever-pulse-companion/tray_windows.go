@@ -24,6 +24,7 @@ import (
 	"wowsync/internal/store"
 	"wowsync/internal/update"
 	"wowsync/internal/vue"
+	"wowsync/internal/watch"
 	"wowsync/internal/winui"
 )
 
@@ -88,6 +89,21 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 	// est réécrite à chaque démarrage pour suivre l'exécutable s'il a été déplacé.
 	_ = winui.StartWithWindows(cfg.StartWithWindows)
 
+	// rc.11 : un dossier du jeu sans ForeverPulse.lua est remplacé par celui que
+	// déclare Battle.net (ou un emplacement usuel) s'il en contient un. Un dossier
+	// où le jeu est présent n'est remplacé que par un dossier où l'addon a écrit.
+	if actuel := watch.Examine(cfg.WowDir); actuel != watch.DossierPret {
+		candidats := append(winui.DossiersBattleNet(), watch.CandidatsCourants(winui.Lecteurs())...)
+		if d := watch.Detecte(candidats); d != "" && !strings.EqualFold(d, cfg.WowDir) &&
+			(watch.Examine(d) == watch.DossierPret || actuel == watch.DossierAbsent) {
+			log.Printf("dossier du jeu détecté : %s (au lieu de %s)", d, cfg.WowDir)
+			cfg.WowDir = d
+			if err := config.Save(filepath.Join(dir, config.FichierConfig), cfg); err != nil {
+				log.Printf("config.toml : %v", err)
+			}
+		}
+	}
+
 	companionURL := config.PageCompte(cfg.SiteURL)
 	ctx, cancel := context.WithCancel(context.Background())
 	var fin sync.Once
@@ -104,6 +120,12 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		if err := config.Save(filepath.Join(dir, config.FichierConfig), cfg); err != nil {
 			log.Printf("config.toml : %v", err)
 		}
+	}
+
+	dossier := func() string {
+		cfgMu.Lock()
+		defer cfgMu.Unlock()
+		return cfg.WowDir
 	}
 
 	// Dernier état connu : le menu du clic droit le lit sans toucher à la base,
@@ -126,6 +148,8 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			Envoyes: e.Sent, Attente: e.Pending, Refuses: e.Rejected, DernierEnvoi: e.DernierEnvoi, Version: app.Version,
 			Details: e.Details, Auctions: true, AuctionSent: e.AuctionSent, AuctionPending: e.AuctionPending, AuctionUnproven: e.AuctionUnproven}
 		m.Connection, m.ConnectionCode = connectionText, connectionCode
+		m.Dossier = dossier()
+		m.DossierEtat = int(watch.Examine(m.Dossier))
 		for _, p := range e.Portees {
 			m.Portees = append(m.Portees, vue.Portee{Nom: p.ScopeID, Total: p.Total, Depuis: p.Depuis})
 		}
@@ -226,6 +250,30 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			t.Notify(winui.AppName, err.Error(), true)
 		} else {
 			t.Notify(winui.AppName, i18n.T("notify.sent"), false)
+		}
+	}
+	// rc.11 : choix du dossier du jeu, appliqué sans redémarrer.
+	choisirDossier := func() {
+		choisi, ok := w.ChoisirDossier(i18n.T("dir.pick"), dossier())
+		if !ok {
+			return
+		}
+		d := watch.Racine(choisi)
+		if watch.Examine(d) != watch.DossierPret &&
+			!w.Confirm(i18n.T("dir.confirm", d, i18n.T("dir.confirmwhy")), i18n.T("dir.keep")) {
+			return
+		}
+		if strings.EqualFold(d, dossier()) {
+			refresh()
+			return
+		}
+		sauve(func(c *config.Config) { c.WowDir = d })
+		log.Printf("dossier du jeu choisi : %s", d)
+		t.Notify(winui.AppName, i18n.T("notify.dir", d), false)
+		refresh()
+		select {
+		case reveil <- struct{}{}:
+		default:
 		}
 	}
 	demarrage := func(on bool) {
@@ -366,6 +414,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			{Label: i18n.T("connect.cancel"), Action: annulerConnexion},
 			{Label: i18n.T("btn.installations"), Action: func() { winui.Open(companionURL) }},
 			{Label: i18n.T("btn.log"), Action: func() { winui.Open(log.Path()) }},
+			{Label: i18n.T("menu.dir"), Action: func() { w.PostShow(); choisirDossier() }},
 			{Label: i18n.T("win.autostart"), Checked: winui.StartsWithWindows(), Action: func() {
 				on := !winui.StartsWithWindows()
 				demarrage(on)
@@ -389,6 +438,8 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			// The window marks a command busy until it returns. Pairing can take
 			// 15 minutes; keep this button available to reopen the browser.
 			go connecter(false)
+		case winui.CmdDossier:
+			choisirDossier()
 		case winui.CmdEffacer:
 			effacer()
 		case winui.CmdDesinstaller:
@@ -424,7 +475,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			if c.AutoUpdate {
 				go verifier()
 			}
-		})
+		}, dossier)
 	})
 	cancel()
 	connectMu.Lock()

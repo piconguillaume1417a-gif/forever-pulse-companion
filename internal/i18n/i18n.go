@@ -138,6 +138,22 @@ var msgs = map[string][2]string{
 	"dlg.uninstall": {"Désinstaller", "Uninstall"},
 	"dlg.cancel":    {"Annuler", "Cancel"},
 
+	// rc.11 : dossier du jeu
+	"dir.title":      {"Dossier du jeu", "Game folder"},
+	"dir.ready":      {"addon trouvé", "addon found"},
+	"dir.nolua":      {"addon jamais lancé", "addon not run yet"},
+	"dir.absent":     {"jeu introuvable", "game not found"},
+	"btn.dir":        {"Changer…", "Change…"},
+	"menu.dir":       {"Choisir le dossier du jeu…", "Choose game folder…"},
+	"tip.dir":        {"Choisissez le dossier World of Warcraft si le jeu n'est pas installé à l'emplacement habituel.", "Choose the World of Warcraft folder if the game is not installed in the usual place."},
+	"tip.dirpath":    {`Le compagnon y cherche _*_\WTF\Account\*\SavedVariables\ForeverPulse.lua.`, `The companion looks for _*_\WTF\Account\*\SavedVariables\ForeverPulse.lua there.`},
+	"dir.pick":       {"Choisissez le dossier World of Warcraft", "Choose the World of Warcraft folder"},
+	"dir.confirm":    {"Aucun ForeverPulse.lua dans ce dossier. Le garder quand même ?\n\n%s\n\n%s", "No ForeverPulse.lua in this folder. Keep it anyway?\n\n%s\n\n%s"},
+	"dir.confirmwhy": {"Choisissez le dossier « World of Warcraft » qui contient _retail_, _classic_beta_… Si l'addon n'a encore jamais été lancé, le fichier apparaîtra à la prochaine déconnexion ou au prochain /reload.", "Choose the “World of Warcraft” folder that contains _retail_, _classic_beta_… If the addon has never run yet, the file will appear at the next logout or /reload."},
+	"dir.keep":       {"Garder ce dossier", "Keep this folder"},
+	"dir.fail":       {"Le sélecteur de dossier n'a pas pu s'ouvrir. Corrigez wow_dir dans config.toml, puis relancez le compagnon.", "The folder picker could not open. Edit wow_dir in config.toml, then restart the companion."},
+	"notify.dir":     {"Dossier du jeu : %s", "Game folder: %s"},
+
 	// Menu de l'icône
 	"menu.open": {"Ouvrir Forever Pulse Companion", "Open Forever Pulse Companion"},
 

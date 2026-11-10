@@ -141,7 +141,7 @@ Les données du compagnon vivent dans `%APPDATA%\ForeverPulse\Companion\` :
 | `companion.db` | base locale : fichiers déjà lus, file d'envoi, cumul des personnages observés |
 | `companion.log` | journal (5 Mo × 3 fichiers au plus), sans jeton ni nom de personnage |
 
-Si WoW n'est pas installé dans `C:\Program Files (x86)\World of Warcraft`, corrigez `wow_dir` dans `config.toml`, puis relancez le compagnon. Le sous-dossier du client (`_classic_beta_` aujourd'hui) est trouvé tout seul.
+Si WoW n'est pas installé dans `C:\Program Files (x86)\World of Warcraft`, le compagnon essaie au démarrage le dossier déclaré par Battle.net, puis les emplacements usuels de chaque lecteur. Sinon, la carte « Dossier du jeu » de la fenêtre (ou « Choisir le dossier du jeu… » dans le menu de l'icône) ouvre un sélecteur : choisissez le dossier `World of Warcraft`, ou le dossier du client (`_forever_`, `_classic_beta_`…) ou même `WTF` ; la racine est déduite et le changement s'applique sans relancer. `wow_dir` dans `config.toml` reste modifiable à la main.
 
 ## La fenêtre
 

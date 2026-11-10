@@ -16,7 +16,7 @@ SYM = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 if os.name == "nt":
     fonts = os.path.join(os.environ.get("WINDIR", "C:/Windows"), "Fonts")
     REG, BOLD, SYM = [os.path.join(fonts, name) for name in ("segoeui.ttf", "segoeuib.ttf", "seguisym.ttf")]
-GLYPHES = {"": "➤", "": "⎘", "": "↗", "": "☰", "": "◷",
+GLYPHES = {"": "▤", "": "➤", "": "⎘", "": "↗", "": "☰", "": "◷",
            "": "◍", "": "✓", "": "↻", "": "⚠"}
 _polices = {}
 

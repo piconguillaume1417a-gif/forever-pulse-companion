@@ -14,8 +14,10 @@ func modeles() []Modele {
 	for i, code := range []string{"allsent", "pending", "notoken", "token", "schema", "source", "body", "rejected"} {
 		m := Modele{Pret: true, Code: code, Message: "message", Couleur: i % 3, Envoyes: 546, Attente: 5,
 			Refuses: 2, DernierEnvoi: "x", Version: "0.6.0", Portees: p[:i%3]}
+		m.Dossier, m.DossierEtat = `C:\Program Files (x86)\World of Warcraft`, i%3
 		out = append(out, m)
 	}
+	out = append(out, Modele{Pret: true, Code: "allsent", Dossier: `E:\Un dossier très long\Jeux installés ailleurs\Battle.net\World of Warcraft`, DossierEtat: DossierAbsent})
 	var six []Portee
 	for i := 0; i < 6; i++ {
 		six = append(six, Portee{"s", i, "d"})
@@ -68,7 +70,7 @@ func TestMiseEnPage(t *testing.T) {
 						}
 					}
 				}
-				for _, id := range []int{Envoyer, Installations, Journal, Page, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
+				for _, id := range []int{Envoyer, Installations, Journal, Page, Dossier, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
 					if !vus[id] {
 						t.Errorf("commande %d absente", id)
 					}
@@ -133,4 +135,33 @@ func TestConnexionGardeLeCodeMalgreLeBlocageJeton(t *testing.T) {
 		}
 	}
 	i18n.Set(i18n.FR)
+}
+
+// Le bouton « Changer… » passe en couleur quand le jeu est introuvable.
+func TestDossierIntrouvableEnCouleur(t *testing.T) {
+	th := Clair()
+	for _, c := range []struct {
+		etat     int
+		primaire bool
+	}{{DossierAbsent, true}, {DossierSansLua, false}, {DossierPret, false}} {
+		ops, zones, _, _ := Construire(Modele{Pret: true, Code: "allsent", Dossier: "D:/WoW", DossierEtat: c.etat}, Interaction{Survol: -1, Appui: -1}, th)
+		var r Rect
+		for _, z := range zones {
+			if z.ID == Dossier {
+				r = z.R
+			}
+		}
+		if r.W == 0 {
+			t.Fatal("bouton Dossier absent")
+		}
+		coul := false
+		for _, o := range ops {
+			if o.Genre == OpRect && o.R == r {
+				coul = o.Couleur == th.Accent
+			}
+		}
+		if coul != c.primaire {
+			t.Errorf("état %d : bouton en couleur = %t", c.etat, coul)
+		}
+	}
 }

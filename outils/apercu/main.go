@@ -26,7 +26,8 @@ type scene struct {
 
 func main() {
 	portees := []vue.Portee{{Nom: "4619-PVP-Alliance", Total: 51767, Depuis: "18/09/2026"}, {Nom: "4619-PVP-Horde", Total: 2310, Depuis: "21/09/2026"}}
-	base := vue.Modele{Pret: true, Version: "0.9.0-rc.2", Demarrage: true, Envoyes: 546, DernierEnvoi: "Dernier envoi : 27/09 15:04, 12 lots, 3456 personnages", Portees: portees}
+	base := vue.Modele{Pret: true, Version: "0.9.0-rc.2", Demarrage: true, Envoyes: 546, DernierEnvoi: "Dernier envoi : 27/09 15:04, 12 lots, 3456 personnages", Portees: portees,
+		Dossier: "C:/Program Files (x86)/World of Warcraft", DossierEtat: vue.DossierPret}
 	cas := []struct {
 		nom   string
 		lang  i18n.Lang
@@ -45,6 +46,16 @@ func main() {
 			m.Connection = i18n.T("connect.connected", "synthetic@example.invalid")
 			return m
 		}, vue.Interaction{}},
+		{"00-dossier-introuvable-fr", i18n.FR, vue.Clair(), func(m vue.Modele) vue.Modele {
+			m.Code, m.Message, m.Couleur = "allsent", "Tout est envoyé", 0
+			m.Dossier, m.DossierEtat = "C:/Program Files (x86)/World of Warcraft", vue.DossierAbsent
+			return m
+		}, vue.Interaction{Survol: -1, Appui: -1}},
+		{"00-dossier-sans-lua-en", i18n.EN, vue.Sombre(), func(m vue.Modele) vue.Modele {
+			m.Code, m.Message, m.Couleur = "allsent", "Everything is sent", 0
+			m.Dossier, m.DossierEtat = "E:/Games/Blizzard/World of Warcraft", vue.DossierSansLua
+			return m
+		}, vue.Interaction{Survol: -1, Appui: -1}},
 		{"01-tout-envoye-clair-en", i18n.EN, vue.Clair(), func(m vue.Modele) vue.Modele {
 			m.Couleur, m.Code, m.Message = 0, "allsent", "Everything has been sent"
 			m.DernierEnvoi = "Last upload: Sep 27, 15:04, 12 batches, 3456 characters"

@@ -13,7 +13,7 @@ const Largeur = 440
 // Identifiants des zones cliquables. Les commandes gardent les valeurs de la 0.5.0.
 const (
 	Envoyer = 201 + iota
-	_ // ancien « Coller le jeton » (retiré en 0.10.0) ; gardé pour la numérotation
+	_       // ancien « Coller le jeton » (retiré en 0.10.0) ; gardé pour la numérotation
 	Journal
 	Page
 	Demarrage
@@ -28,6 +28,14 @@ const (
 	Details // 0.7.0 : ligne « Dernier envoi » : détail de l'état (infobulle seule)
 	PrixDetails
 	Installations // 0.10.0 : « Gérer les installations » (page du compte)
+	Dossier       // rc.11 : « Changer… », dossier du jeu
+)
+
+// État du dossier du jeu (mêmes valeurs que watch.EtatDossier).
+const (
+	DossierAbsent = iota
+	DossierSansLua
+	DossierPret
 )
 
 // Genre d'opération de dessin.
@@ -113,6 +121,10 @@ type Modele struct {
 	// Code de comparaison d'une association en cours, affiché en grand à côté
 	// de Connection : le même que celui de la page du site.
 	ConnectionCode string
+
+	// rc.11 : dossier du jeu surveillé et ce qu'on y trouve (DossierAbsent…).
+	Dossier     string
+	DossierEtat int
 }
 
 // Connexion : la ligne d'association de la fenêtre et son code de comparaison.
@@ -199,9 +211,13 @@ func mesures(nPortees int) (yCumul, hCumul, total int) {
 	hCumul = 38 + lignesCumul(nPortees)*28 + 8
 	y := yCumul + hCumul + 14 // boutons
 	y += 40 + 8 + 34 + 14     // deux rangées de boutons
+	y += hDossier + 14        // dossier du jeu
 	y += 52 + 14              // réglages
 	return yCumul, hCumul, y + 50
 }
+
+// hDossier : hauteur de la carte « Dossier du jeu ».
+const hDossier = 58
 
 // Glyphes (Segoe MDL2 Assets, présente depuis Windows 10).
 const (
@@ -213,6 +229,7 @@ const (
 	GlypheOK      = ""
 	GlypheAttente = ""
 	GlypheAlerte  = ""
+	GlypheDossier = "" // dossier ouvert
 )
 
 // Construire : les opérations de dessin et les zones cliquables, en pixels logiques.
@@ -421,6 +438,30 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 	bouton(Installations, Rect{16, yb, bw, 34}, false, GlypheLien, "btn.installations", "tip.installations")
 	bouton(Journal, Rect{16 + bw + 8, yb, bw, 34}, false, GlypheJournal, "btn.log", "tip.log")
 	yb += 34 + 14
+
+	// Dossier du jeu : chemin surveillé, ce qu'on y trouve, bouton « Changer… ».
+	carte(Rect{16, yb, W - 32, hDossier})
+	{
+		bx := W - 16 - 12 - 96
+		etatTexte, etatCoul := i18n.T("dir.ready"), th.Doux
+		switch m.DossierEtat {
+		case DossierAbsent:
+			etatTexte, etatCoul = i18n.T("dir.absent"), th.Danger
+		case DossierSansLua:
+			etatTexte, etatCoul = i18n.T("dir.nolua"), th.Alerte
+		}
+		glyphe(Rect{28, yb, 20, hDossier}, GlypheDossier, 14, th.Accent)
+		texte(Rect{56, yb + 8, bx - 56 - 8, 18}, i18n.T("dir.title")+" · "+etatTexte, 12, true, etatCoul, Gauche)
+		chemin := m.Dossier
+		if chemin == "" {
+			chemin = "—"
+		}
+		texte(Rect{56, yb + 28, bx - 56 - 8, 20}, chemin, 12, false, th.Texte, Gauche)
+		zones = append(zones, Zone{ID: 991, R: Rect{24, yb + 4, bx - 24 - 8, hDossier - 8},
+			Bulle: m.Dossier + "\n" + i18n.T("tip.dirpath"), Info: true})
+		bouton(Dossier, Rect{bx, yb + 12, 96, 34}, m.DossierEtat == DossierAbsent, "", "btn.dir", "tip.dir")
+	}
+	yb += hDossier + 14
 
 	// Réglages : interrupteur « Lancer au démarrage » et langue.
 	carte(Rect{16, yb, W - 32, 52})
