@@ -32,6 +32,7 @@ const (
 	CmdReduire       = vue.Reduire
 	CmdQuitter       = vue.Quitter
 	CmdInstallations = vue.Installations
+	CmdDossier       = vue.Dossier
 )
 
 var (

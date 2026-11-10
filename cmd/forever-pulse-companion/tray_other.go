@@ -27,7 +27,7 @@ func runTray(dataDir string, _ bool, _ int) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	engine(ctx, a, cfg, log, nil, nil)
+	engine(ctx, a, cfg, log, nil, nil, nil)
 	return nil
 }
 

@@ -495,14 +495,20 @@ func runConnect(dataDir string) error {
 //
 // 0.10.0 : pret (facultatif) est appelé une fois la première passe terminée ; il
 // confirme une mise à jour à l'essai.
-func engine(ctx context.Context, a *app.App, cfg config.Config, log *logx.Logger, reveil <-chan struct{}, pret func()) {
+//
+// rc.11 : dossier (facultatif) donne le dossier du jeu à chaque passage ; un
+// dossier choisi dans la fenêtre est suivi sans redémarrer. Nil : cfg.WowDir.
+func engine(ctx context.Context, a *app.App, cfg config.Config, log *logx.Logger, reveil <-chan struct{}, pret func(), dossier func() string) {
+	if dossier == nil {
+		dossier = func() string { return cfg.WowDir }
+	}
 	w := watch.New()
 	// Au démarrage : les deux fichiers, .lua et .bak (la session précédente peut
 	// n'exister plus que dans le .bak).
 	// 0.7.2 : l'état est noté AVANT la lecture. Noté après, un fichier réécrit par le
 	// jeu pendant la lecture de démarrage passait pour déjà lu jusqu'à l'écriture
 	// suivante ; noté avant, il est relu (une empreinte déjà lue est ignorée).
-	initiaux := watch.Discover(cfg.WowDir)
+	initiaux := watch.Discover(dossier())
 	w.Mark(initiaux)
 	for _, p := range initiaux {
 		if _, err := a.ProcessFile(ctx, p); err != nil {
@@ -518,7 +524,7 @@ func engine(ctx context.Context, a *app.App, cfg config.Config, log *logx.Logger
 	// des dizaines de Mo inutilisés ; ils sont rendus à Windows tout de suite.
 	debug.FreeOSMemory()
 	sondage := time.Duration(cfg.PollSeconds) * time.Second
-	w.Ready(watch.DiscoverAuctions(cfg.WowDir), time.Now())
+	w.Ready(watch.DiscoverAuctions(dossier()), time.Now())
 	premierDelai := sondage
 	if w.EnAttente() {
 		premierDelai = w.Stable
@@ -538,7 +544,8 @@ func engine(ctx context.Context, a *app.App, cfg config.Config, log *logx.Logger
 			}
 		case <-minuterie.C:
 		}
-		for _, p := range w.Ready(watch.DiscoverAll(cfg.WowDir), time.Now()) {
+		wowDir := dossier()
+		for _, p := range w.Ready(watch.DiscoverAll(wowDir), time.Now()) {
 			if app.AuctionPath(p) && !w.IsStable(filepath.Join(filepath.Dir(p), "ForeverPulse.lua"), time.Now()) {
 				w.Retry(p)
 				continue
@@ -548,7 +555,7 @@ func engine(ctx context.Context, a *app.App, cfg config.Config, log *logx.Logger
 				w.Retry(p) // nouvel essai au sondage suivant
 			}
 		}
-		for _, p := range watch.DiscoverAuctions(cfg.WowDir) {
+		for _, p := range watch.DiscoverAuctions(wowDir) {
 			if w.IsStable(p, time.Now()) && w.IsStable(filepath.Join(filepath.Dir(p), "ForeverPulse.lua"), time.Now()) {
 				if _, err := a.ProcessAuctions(ctx, p); err != nil {
 					w.Retry(p)
