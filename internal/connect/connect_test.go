@@ -423,8 +423,8 @@ func TestStartToleratesClockSkew(t *testing.T) {
 			defer cancel()
 			err := c.Start(ctx)
 			if !tc.accept {
-				if err == nil || err.Error() != "network" {
-					t.Fatalf("want network refusal, got %v (states %v)", err, states)
+				if err == nil || err.Error() != "expiry_refused" {
+					t.Fatalf("want expiry refusal, got %v (states %v)", err, states)
 				}
 				return
 			}
@@ -446,5 +446,42 @@ func TestLocalExpiryFollowsServerRemainingTime(t *testing.T) {
 	got, ok = localExpiry(Result{Expires: server.Add(20 * time.Minute), Received: received}, budget)
 	if !ok || !got.Equal(budget) {
 		t.Fatalf("without Date header keep the local budget, got %v %v", got, ok)
+	}
+}
+
+// A site URL typed with capitals still matches the server's lower-case page,
+// and a different origin is reported as site_mismatch, not a generic failure.
+func TestStartSiteMatchNamesItsRefusal(t *testing.T) {
+	for _, tc := range []struct {
+		name, host string
+		want       string
+	}{{"capitals", "", ""}, {"other origin", "https://example.invalid", "site_mismatch"}} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := &memoryVault{}
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var in map[string]string
+				_ = json.NewDecoder(r.Body).Decode(&in)
+				w.Header().Set("Content-Type", "application/json")
+				if in["operation"] != "start" {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(Result{Error: "access_denied"})
+					return
+				}
+				origin := strings.ToLower(server.URL)
+				if tc.host != "" {
+					origin = tc.host
+				}
+				_ = json.NewEncoder(w).Encode(Result{State: "pending", Interval: 5, Code: Code(in["verifier"]), Expires: time.Now().Add(14 * time.Minute), URI: origin + "/account/companion/connect?request=" + in["request_id"]})
+			}))
+			defer server.Close()
+			c := Client{Site: strings.Replace(server.URL, "http://", "HTTP://", 1), Vault: v, SaveToken: func(string) error { return nil }}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			err := c.Start(ctx)
+			if tc.want == "" && err != nil || tc.want != "" && (err == nil || err.Error() != tc.want) {
+				t.Fatalf("want %q, got %v", tc.want, err)
+			}
+		})
 	}
 }

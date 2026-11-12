@@ -228,6 +228,9 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			err = connector.Start(cctx)
 		}
 		if err != nil && cctx.Err() == nil {
+			// Fixed internal names only (vault, site_mismatch, expiry_refused…):
+			// never a response body, token or account address.
+			log.Printf("association : échec (%s)", err)
 			// A Windows credential failure has its own message: "try again" would
 			// not help, and it is not a website problem.
 			if err.Error() == "vault" {

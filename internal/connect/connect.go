@@ -293,7 +293,7 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 			return nil
 		case "authorization_pending", "slow_down":
 			if out.Interval < 5 || out.Interval > 60 {
-				return errors.New("network")
+				return errors.New("bad_interval")
 			}
 			interval = time.Duration(out.Interval) * time.Second
 			c.report("pending", Code(r.Verifier))
@@ -302,8 +302,15 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 				expected := strings.TrimRight(c.Site, "/") + "/account/companion/connect?request=" + r.ID
 				u, e := url.Parse(out.URI)
 				expires, ok := localExpiry(out, r.Expires)
-				if e != nil || u.String() != expected || out.Code != Code(r.Verifier) || !ok {
-					return errors.New("network")
+				// Each refusal has its own name: it reaches the log (never the
+				// response body), so a report says which check failed.
+				switch {
+				case e != nil || !strings.EqualFold(u.String(), expected):
+					return errors.New("site_mismatch")
+				case out.Code != Code(r.Verifier):
+					return errors.New("code_mismatch")
+				case !ok:
+					return errors.New("expiry_refused")
 				}
 				r.Expires = expires
 				if e = c.save(r); e != nil {
@@ -327,7 +334,7 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 				return nil
 			} else if op == "poll" && out.State == "approved" {
 				if _, ok := secret.Normalise(out.Token); !ok || out.Account == "" || len(out.Account) > 254 {
-					return errors.New("network")
+					return errors.New("bad_token")
 				}
 				if e = c.SaveToken(out.Token); e != nil {
 					return errors.New("vault")
@@ -339,10 +346,10 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 				}
 				continue // acknowledge only after both vault writes succeeded
 			} else {
-				return errors.New("network")
+				return errors.New("unexpected_state")
 			}
 		default:
-			return errors.New("network")
+			return errors.New("unexpected_error")
 		}
 		if !wait(ctx, interval, c.OpenRequests, reopen) {
 			if time.Now().After(r.Expires) {
