@@ -375,3 +375,113 @@ func TestReopeningDoesNotResetPollTimer(t *testing.T) {
 		t.Fatal("no clicks handled during poll wait")
 	}
 }
+
+// A PC clock minutes off must not block pairing: the server's expiry is read
+// relative to its Date header. A server announcing more than 15 minutes is
+// still refused, and the local deadline follows the server's remaining time.
+func TestStartToleratesClockSkew(t *testing.T) {
+	cases := []struct {
+		name   string
+		skew   time.Duration // server clock minus PC clock
+		life   time.Duration // lifetime announced by the server
+		date   bool
+		accept bool
+	}{
+		{"pc behind 5 min", 5 * time.Minute, 15 * time.Minute, true, true},
+		{"pc ahead 10 min", -10 * time.Minute, 15 * time.Minute, true, true},
+		{"pc behind 2 h", 2 * time.Hour, 15 * time.Minute, true, true},
+		{"no date header", 5 * time.Minute, 15 * time.Minute, false, true},
+		{"server life too long", 0, 2 * time.Hour, true, false},
+		{"already expired", 0, -time.Minute, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := &memoryVault{}
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var in map[string]string
+				_ = json.NewDecoder(r.Body).Decode(&in)
+				now := time.Now().Add(tc.skew).UTC()
+				w.Header().Set("Content-Type", "application/json")
+				if tc.date {
+					w.Header().Set("Date", now.Format(http.TimeFormat))
+				} else {
+					w.Header()["Date"] = nil // suppress the automatic header
+				}
+				if in["operation"] != "start" {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(Result{Error: "access_denied"})
+					return
+				}
+				_ = json.NewEncoder(w).Encode(Result{State: "pending", Interval: 5, Code: Code(in["verifier"]), Expires: now.Add(tc.life), URI: server.URL + "/account/companion/connect?request=" + in["request_id"]})
+			}))
+			defer server.Close()
+			var states []string
+			c := Client{Site: server.URL, Vault: v, SaveToken: func(string) error { return nil },
+				Status: func(state, _ string) { states = append(states, state) }}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			err := c.Start(ctx)
+			if !tc.accept {
+				if err == nil || err.Error() != "expiry_refused" {
+					t.Fatalf("want expiry refusal, got %v (states %v)", err, states)
+				}
+				return
+			}
+			if err != nil || len(states) == 0 || states[0] != "pending" {
+				t.Fatalf("want accepted pending request, got %v (states %v)", err, states)
+			}
+		})
+	}
+}
+
+func TestLocalExpiryFollowsServerRemainingTime(t *testing.T) {
+	received := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	budget := received.Add(15 * time.Minute)
+	server := received.Add(-10 * time.Minute) // PC 10 min ahead
+	got, ok := localExpiry(Result{Expires: server.Add(5 * time.Minute), ServerTime: server, Received: received}, budget)
+	if !ok || !got.Equal(received.Add(5*time.Minute)) {
+		t.Fatalf("got %v %v", got, ok)
+	}
+	got, ok = localExpiry(Result{Expires: server.Add(20 * time.Minute), Received: received}, budget)
+	if !ok || !got.Equal(budget) {
+		t.Fatalf("without Date header keep the local budget, got %v %v", got, ok)
+	}
+}
+
+// A site URL typed with capitals still matches the server's lower-case page,
+// and a different origin is reported as site_mismatch, not a generic failure.
+func TestStartSiteMatchNamesItsRefusal(t *testing.T) {
+	for _, tc := range []struct {
+		name, host string
+		want       string
+	}{{"capitals", "", ""}, {"other origin", "https://example.invalid", "site_mismatch"}} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := &memoryVault{}
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var in map[string]string
+				_ = json.NewDecoder(r.Body).Decode(&in)
+				w.Header().Set("Content-Type", "application/json")
+				if in["operation"] != "start" {
+					w.WriteHeader(http.StatusBadRequest)
+					_ = json.NewEncoder(w).Encode(Result{Error: "access_denied"})
+					return
+				}
+				origin := strings.ToLower(server.URL)
+				if tc.host != "" {
+					origin = tc.host
+				}
+				_ = json.NewEncoder(w).Encode(Result{State: "pending", Interval: 5, Code: Code(in["verifier"]), Expires: time.Now().Add(14 * time.Minute), URI: origin + "/account/companion/connect?request=" + in["request_id"]})
+			}))
+			defer server.Close()
+			c := Client{Site: strings.Replace(server.URL, "http://", "HTTP://", 1), Vault: v, SaveToken: func(string) error { return nil }}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			err := c.Start(ctx)
+			if tc.want == "" && err != nil || tc.want != "" && (err == nil || err.Error() != tc.want) {
+				t.Fatalf("want %q, got %v", tc.want, err)
+			}
+		})
+	}
+}

@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	Version = "0.10.0-rc.13"
+	Version = "0.10.0-rc.14"
 	Nom     = "forever-pulse-companion"
 )
 
