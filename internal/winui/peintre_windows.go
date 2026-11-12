@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
+	"wowsync/internal/i18n"
 	"wowsync/internal/icone"
 	"wowsync/internal/vue"
 )
@@ -121,8 +122,8 @@ func (p *peintre) police(k clePolice) uintptr {
 	if k.gras {
 		face, poids = "Segoe UI Semibold", 600
 	}
-	// Texte coréen : Malgun Gothic (livrée avec Windows), en gras 700 (malgunbd) ;
-	// Segoe UI n'a pas de hangul et le repli de GDI n'est pas garanti.
+	// Interface coréenne : Malgun Gothic (livrée avec Windows), en gras 700
+	// (malgunbd) ; Segoe UI n'a pas de hangul.
 	if k.coreen {
 		face = "Malgun Gothic"
 		if k.gras {
@@ -266,9 +267,16 @@ const (
 	dtEndEllipsis = 0x8000
 )
 
+// policeCoreenne : Malgun Gothic seulement pour un texte en hangul d'une interface en
+// coréen. En français ou en anglais, un hangul isolé (case « 한국어 », dossier au nom
+// coréen) garde Segoe UI et le repli de Windows (FontLink) : Malgun Gothic dessinerait
+// « \ » en « ₩ » dans un chemin.
+func policeCoreenne(o vue.Op) bool {
+	return o.Genre != vue.OpGlyphe && i18n.Get() == i18n.KO && vue.Coreen(o.Texte)
+}
+
 func (p *peintre) texte(hdc uintptr, o vue.Op) {
-	glyphe := o.Genre == vue.OpGlyphe
-	h := p.police(clePolice{taille: o.Taille, gras: o.Gras, sou: o.Souligne, glyphe: glyphe, coreen: !glyphe && vue.Coreen(o.Texte)})
+	h := p.police(clePolice{taille: o.Taille, gras: o.Gras, sou: o.Souligne, glyphe: o.Genre == vue.OpGlyphe, coreen: policeCoreenne(o)})
 	old, _, _ := pSelectObject.Call(hdc, h)
 	pSetTextColor.Call(hdc, bgr(o.Couleur))
 	rc := struct{ L, T, R, B int32 }{int32(p.d(o.R.X)), int32(p.d(o.R.Y)), int32(p.d(o.R.X + o.R.W)), int32(p.d(o.R.Y + o.R.H))}
@@ -293,9 +301,10 @@ func (p *peintre) texte(hdc uintptr, o vue.Op) {
 	pSelectObject.Call(hdc, old)
 }
 
-// couper : retours à la ligne aux espaces seulement. DrawText coupe le hangul entre
-// deux syllabes, au milieu d'un mot ; le coréen se coupe entre les mots (comme
-// word-break: keep-all). Un mot plus large que la ligne reste coupé par DrawText.
+// couper : retours à la ligne aux espaces U+0020 seulement. DrawText coupe le hangul
+// entre deux syllabes, au milieu d'un mot ; le coréen se coupe entre les mots (comme
+// word-break: keep-all). Les espaces insécables et les blancs répétés sont gardés ;
+// un mot plus large que la ligne reste coupé par DrawText.
 func (p *peintre) couper(hdc uintptr, s string, largeur int) string {
 	mesure := func(t string) int {
 		u, _ := windows.UTF16FromString(t)
@@ -308,15 +317,14 @@ func (p *peintre) couper(hdc uintptr, s string, largeur int) string {
 		if i > 0 {
 			b.WriteString("\n")
 		}
-		ligne := ""
-		for _, mot := range strings.Fields(para) {
-			if ligne != "" && mesure(ligne+" "+mot) > largeur {
+		mots := strings.Split(para, " ")
+		ligne := mots[0]
+		for _, mot := range mots[1:] {
+			if strings.TrimSpace(ligne) != "" && mot != "" && mesure(ligne+" "+mot) > largeur {
 				b.WriteString(ligne + "\n")
 				ligne = mot
-			} else if ligne != "" {
-				ligne += " " + mot
 			} else {
-				ligne = mot
+				ligne += " " + mot
 			}
 		}
 		b.WriteString(ligne)

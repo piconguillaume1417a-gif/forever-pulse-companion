@@ -109,7 +109,10 @@ internal static class TestLayout
                     float scale;
                     using (Graphics graphics = window.CreateGraphics()) scale = graphics.DpiX / 96F;
                     window.ClientSize = new Size((int)(width * scale), (int)(480 * scale));
-                    window.Font = new Font(args[1] == "ko-KR" ? "Malgun Gothic" : "Segoe UI", fontSize);
+                    // The font family is the one Setup.cs chose for this language (never forced here).
+                    Require(window.Font.FontFamily.Name == (args[1] == "ko-KR" ? "Malgun Gothic" : "Segoe UI"),
+                        "Unexpected setup font: " + window.Font.FontFamily.Name);
+                    window.Font = new Font(window.Font.FontFamily, fontSize);
                     TextBox path = FindPath(window);
                     Require(path != null, "Installation path is missing");
                     if (length == 0)

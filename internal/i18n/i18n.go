@@ -4,8 +4,11 @@
 // tout ce que la fenêtre, le menu et les notifications affichent passe par T.
 //
 // Ajouter une langue : un fichier textes_<code>.go (mêmes clés que textes_en.go,
-// mêmes verbes de format dans le même ordre) et une ligne dans langues. Une clé
-// absente d'une langue s'affiche en anglais.
+// mêmes verbes de format dans le même ordre), une ligne dans langues, et pour le
+// sélecteur de la fenêtre une constante Langue<XX> en fin de liste et une ligne dans
+// zonesLangue (internal/vue), plus son identifiant dans le case du sélecteur de
+// Window.activer (internal/winui). TestSelecteurDeLangue échoue si zonesLangue
+// oublie une langue. Une clé absente d'une langue s'affiche en anglais.
 package i18n
 
 import (
@@ -18,7 +21,7 @@ type Lang string
 const (
 	FR Lang = "fr"
 	EN Lang = "en"
-	KO Lang = "ko" // rc.17
+	KO Lang = "ko"
 )
 
 // langue : une ligne de la table des langues.

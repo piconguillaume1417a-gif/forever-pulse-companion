@@ -18,7 +18,7 @@ using System.Windows.Forms;
 
 internal static class Program
 {
-    // French or Korean when Windows is in that language, English otherwise (0.10.0 ; rc.17 : Korean).
+    // French or Korean when Windows is in that language, English otherwise (0.10.0; Korean added with the Korean Companion).
     internal static readonly string Language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
     internal static readonly bool French = Language == "fr";
     internal static readonly bool Korean = Language == "ko";

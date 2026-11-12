@@ -20,7 +20,7 @@ police agrandie ne constitue pas une preuve sur tous les réglages DPI de Window
 `ForeverPulseCompanion.msi` et `ForeverPulseCompanion-Setup.exe` (noms stables pour le lien « latest » du site) ;
 version lue dans la ressource de l'exe (chaîne `0.10.0-rc.3`, numéro MSI `0.10.3` via `update.NumeroWindows`),
 ProductCode dérivé du numéro, UpgradeCode et GUID de composants inchangés (mise à niveau depuis 0.8.0).
-Assistant français, anglais ou coréen (rc.17, police Malgun Gothic) selon la langue de Windows ; il propose de fermer le Compagnon ouvert (`--quit`,
+Assistant français, anglais ou coréen (police Malgun Gothic) selon la langue de Windows ; il propose de fermer le Compagnon ouvert (`--quit`,
 jamais d'arrêt forcé). La désinstallation retire aussi les restes de la mise à jour automatique
 (`.old`, `.new`, `.refusee`). Construit et testé par la CI ; `Test.ps1 -Exe <exe> -OutDir <dossier>`.
 Le texte ci-dessous décrit la livraison 0.8.0 d'origine.

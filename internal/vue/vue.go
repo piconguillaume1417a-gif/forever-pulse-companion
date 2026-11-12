@@ -30,7 +30,7 @@ const (
 	PrixDetails
 	Installations // 0.10.0 : « Gérer les installations » (page du compte)
 	Dossier       // rc.11 : « Changer… », dossier du jeu
-	LangueKO      // rc.17 : sélecteur de langue, troisième choix
+	LangueKO      // sélecteur de langue : coréen
 )
 
 // zonesLangue : une zone du sélecteur par langue, dans l'ordre de i18n.Toutes.

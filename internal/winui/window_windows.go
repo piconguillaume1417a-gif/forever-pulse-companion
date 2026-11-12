@@ -448,8 +448,8 @@ func (w *Window) activer(id int) {
 			go w.OnToggle(on)
 		}
 	case vue.LangueFR, vue.LangueEN, vue.LangueKO:
-		l, _ := vue.LangueDe(id)
-		if l != i18n.Get() && w.OnLangue != nil {
+		// Une zone de langue inconnue de la table n'a aucun effet.
+		if l, ok := vue.LangueDe(id); ok && l != i18n.Get() && w.OnLangue != nil {
 			go w.OnLangue(l)
 		}
 	default:

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -104,7 +105,7 @@ func TestApercuGDI(t *testing.T) {
 	jour := func(j int) string { return time.Date(2026, 9, j, 12, 0, 0, 0, time.UTC).Format(i18n.T("fmt.date")) }
 	base := func() vue.Modele {
 		portees := []vue.Portee{{Nom: "4619-PVP-Alliance", Total: 51767, Depuis: jour(18)}, {Nom: "4619-PVP-Horde", Total: 2310, Depuis: jour(21)}}
-		return vue.Modele{Pret: true, Version: "0.10.0-rc.17", Demarrage: true, Envoyes: 546, Portees: portees,
+		return vue.Modele{Pret: true, Version: "0.10.0-rc.N", Demarrage: true, Envoyes: 546, Portees: portees,
 			Dossier: "C:/Program Files (x86)/World of Warcraft", DossierEtat: vue.DossierPret,
 			Details: []string{"synthétique"}}
 	}
@@ -242,7 +243,7 @@ func rendre(t *testing.T, dpi, wl, hl int, ops []vue.Op) image.Image {
 
 // Un texte de plusieurs lignes tient en entier dans sa case à chaque échelle de
 // Windows : avec DT_EDITCONTROL, une dernière ligne partielle n'est pas dessinée
-// (« Lancer au démarrage de W… » à 144 ppp, rc.17).
+// (« Lancer au démarrage de W… » à 144 ppp, relevé par la vérification du coréen).
 func TestLignesEntieresAChaqueEchelle(t *testing.T) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -273,7 +274,7 @@ func TestLignesEntieresAChaqueEchelle(t *testing.T) {
 					if o.Genre != vue.OpTexte || !o.Lignes {
 						continue
 					}
-					h := p.police(clePolice{taille: o.Taille, gras: o.Gras, coreen: vue.Coreen(o.Texte)})
+					h := p.police(clePolice{taille: o.Taille, gras: o.Gras, coreen: policeCoreenne(o)})
 					old, _, _ := pSelectObject.Call(dc, h)
 					texte := o.Texte
 					largeur := p.d(o.R.X+o.R.W) - p.d(o.R.X)
@@ -291,6 +292,72 @@ func TestLignesEntieresAChaqueEchelle(t *testing.T) {
 				}
 			}
 			p.liberer()
+		}
+	}
+}
+
+// Malgun Gothic seulement dans l'interface coréenne : en français et en anglais, un
+// texte en hangul (case « 한국어 », dossier au nom coréen) garde la police par défaut.
+func TestPoliceCoreenneSelonLaLangue(t *testing.T) {
+	defer i18n.Set(i18n.FR)
+	dossier := vue.Op{Genre: vue.OpTexte, Texte: `D:\게임\World of Warcraft`, Taille: 12}
+	latin := vue.Op{Genre: vue.OpTexte, Texte: `D:\Games\World of Warcraft`, Taille: 12}
+	glyphe := vue.Op{Genre: vue.OpGlyphe, Texte: vue.GlypheOK, Taille: 12}
+	for _, l := range i18n.Toutes {
+		i18n.Set(l)
+		attendu := l == i18n.KO
+		if policeCoreenne(dossier) != attendu || policeCoreenne(vue.Op{Genre: vue.OpTexte, Texte: "한국어"}) != attendu {
+			t.Errorf("%s : Malgun Gothic = %t attendu", l, attendu)
+		}
+		if policeCoreenne(latin) || policeCoreenne(glyphe) {
+			t.Errorf("%s : texte latin ou glyphe en Malgun Gothic", l)
+		}
+	}
+	dc, _, _ := pCreateCompatDCTst.Call(0)
+	if dc == 0 {
+		t.Skip("pas de contexte GDI")
+	}
+	defer pDeleteDC.Call(dc)
+	p := nouveauPeintre(96)
+	defer p.liberer()
+	for _, c := range []struct {
+		l    i18n.Lang
+		face string
+	}{{i18n.FR, "Segoe UI"}, {i18n.EN, "Segoe UI"}, {i18n.KO, "Malgun Gothic"}} {
+		i18n.Set(c.l)
+		old, _, _ := pSelectObject.Call(dc, p.police(clePolice{taille: 12, coreen: policeCoreenne(dossier)}))
+		var face [64]uint16
+		pGetTextFace.Call(dc, uintptr(len(face)), uintptr(unsafe.Pointer(&face[0])))
+		pSelectObject.Call(dc, old)
+		if got := windowsString(face[:]); got != c.face {
+			t.Errorf("%s : police %q au lieu de %q", c.l, got, c.face)
+		}
+	}
+}
+
+// couper ne coupe qu'aux espaces U+0020 : espaces insécables (U+00A0, U+202F) et
+// blancs répétés restent tels quels.
+func TestCouperGardeLesBlancs(t *testing.T) {
+	dc, _, _ := pCreateCompatDCTst.Call(0)
+	if dc == 0 {
+		t.Skip("pas de contexte GDI")
+	}
+	defer pDeleteDC.Call(dc)
+	p := nouveauPeintre(96)
+	defer p.liberer()
+	old, _, _ := pSelectObject.Call(dc, p.police(clePolice{taille: 12, coreen: true}))
+	defer pSelectObject.Call(dc, old)
+	s := "“지금\u00a0전송”을 누르면\u202f바로  시작합니다.\n둘째 줄"
+	if got := p.couper(dc, s, 10000); got != s {
+		t.Errorf("ligne large modifiée : %q", got)
+	}
+	etroit := p.couper(dc, s, 1)
+	if strings.ReplaceAll(etroit, "\n", " ") != strings.ReplaceAll(s, "\n", " ") {
+		t.Errorf("seules des espaces U+0020 deviennent des retours : %q", etroit)
+	}
+	for _, ligne := range strings.Split(etroit, "\n") {
+		if strings.HasPrefix(ligne, "지금") || strings.HasPrefix(ligne, "바로") {
+			t.Errorf("coupure sur un espace insécable : %q", etroit)
 		}
 	}
 }
