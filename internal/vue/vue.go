@@ -3,6 +3,7 @@ package vue
 import (
 	"strconv"
 	"strings"
+	"unicode"
 
 	"wowsync/internal/i18n"
 )
@@ -29,7 +30,24 @@ const (
 	PrixDetails
 	Installations // 0.10.0 : « Gérer les installations » (page du compte)
 	Dossier       // rc.11 : « Changer… », dossier du jeu
+	LangueKO      // rc.17 : sélecteur de langue, troisième choix
 )
+
+// zonesLangue : une zone du sélecteur par langue, dans l'ordre de i18n.Toutes.
+var zonesLangue = []struct {
+	ID int
+	L  i18n.Lang
+}{{LangueFR, i18n.FR}, {LangueEN, i18n.EN}, {LangueKO, i18n.KO}}
+
+// LangueDe : la langue d'une zone du sélecteur.
+func LangueDe(id int) (i18n.Lang, bool) {
+	for _, z := range zonesLangue {
+		if z.ID == id {
+			return z.L, true
+		}
+	}
+	return "", false
+}
 
 // État du dossier du jeu (mêmes valeurs que watch.EtatDossier).
 const (
@@ -159,15 +177,12 @@ func (m Modele) JetonManquant() bool { return m.Code == "notoken" || m.Code == "
 // MaxPortees : lignes du cumul affichées ; au-delà, une ligne « + N autres ».
 const MaxPortees = 4
 
-// Nombre : 51 767 (fr) ou 51,767 (en).
+// Nombre : 51 767 (fr) ou 51,767 (en, ko) ; séparateur de la clé fmt.thousands.
 func Nombre(n int) string {
 	s := strconv.Itoa(n)
 	neg := strings.HasPrefix(s, "-")
 	s = strings.TrimPrefix(s, "-")
-	sep := " "
-	if i18n.Get() == i18n.EN {
-		sep = ","
-	}
+	sep := i18n.T("fmt.thousands")
 	var b strings.Builder
 	for i, c := range s {
 		if i > 0 && (len(s)-i)%3 == 0 {
@@ -482,30 +497,36 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 			kx = 53
 		}
 		add(Op{Genre: OpRond, R: Rect{kx, yb + 19, 14, 14}, Couleur: 0xFFFFFF})
-		texte(Rect{80, yb, W - 16 - 14 - 88 - 24 - 6 - 80, 52}, i18n.T("win.autostart"), 13, false, th.Texte, Gauche)
-		zones = append(zones, Zone{ID: Demarrage, R: Rect{24, yb + 8, 264, 36}, Bulle: i18n.T("tip.autostart")})
+		// Le sélecteur à trois langues laisse moins de place : au besoin, le libellé
+		// passe sur deux lignes, centrées dans la carte.
+		tw := xLangues - 24 - 6 - 80
+		if s := i18n.T("win.autostart"); LargeurTexte(s, 13) <= tw {
+			texte(Rect{80, yb, tw, 52}, s, 13, false, th.Texte, Gauche)
+		} else {
+			add(Op{Genre: OpTexte, R: Rect{80, yb + 8, tw, 36}, Texte: s, Taille: 13, Couleur: th.Texte, Lignes: true})
+		}
+		zones = append(zones, Zone{ID: Demarrage, R: Rect{24, yb + 8, xLangues - 24 - 6 - 24, 36}, Bulle: i18n.T("tip.autostart")})
 	}
 	{
-		gx := W - 16 - 14 - 88
+		gx := xLangues
 		glyphe(Rect{gx - 24, yb, 20, 52}, GlypheGlobe, 14, th.Pale)
-		rect(Rect{gx, yb + 12, 88, 28}, 8, th.Piste)
-		for i, l := range []struct {
-			id  int
-			nom string
-			on  bool
-		}{{LangueFR, "FR", i18n.Get() == i18n.FR}, {LangueEN, "EN", i18n.Get() == i18n.EN}} {
-			r := Rect{gx + 2 + i*42, yb + 14, 42, 24}
-			survol, _, _ := etat(l.id)
+		rect(Rect{gx, yb + 12, W - 16 - 14 - gx, 28}, 8, th.Piste)
+		x := gx + 2
+		for _, z := range zonesLangue {
+			nom, on := i18n.Court(z.L), i18n.Get() == z.L
+			r := Rect{x, yb + 14, largeurCase(nom), 24}
+			x += r.W
+			survol, _, _ := etat(z.ID)
 			c := th.Doux
-			if l.on {
+			if on {
 				rect(r, 6, th.Accent)
 				c = th.SurAccent
 			} else if survol {
 				rect(r, 6, th.BoutonSurvol)
 				c = th.Texte
 			}
-			texte(r, l.nom, 12, l.on, c, Centre)
-			zones = append(zones, Zone{ID: l.id, R: r, Bulle: i18n.T("tip.lang")})
+			texte(r, nom, 12, on, c, Centre)
+			zones = append(zones, Zone{ID: z.ID, R: r, Bulle: i18n.Nom(z.L) + " · " + i18n.T("tip.lang")})
 		}
 	}
 	yb += 52 + 14
@@ -540,5 +561,46 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 	return ops, zones, W, H
 }
 
-// largeurLien : estimation large (Segoe UI 12 px ≈ 6,3 px par caractère).
-func largeurLien(s string) int { return len([]rune(s))*13/2 + 4 }
+// largeurCase : une case du sélecteur de langue (42 px, plus si le libellé l'exige).
+func largeurCase(nom string) int { return max(42, LargeurTexte(nom, 12)+10) }
+
+// xLangues : bord gauche du sélecteur de langue (cases + 2 px de chaque côté).
+var xLangues = func() int {
+	w := 4
+	for _, z := range zonesLangue {
+		w += largeurCase(i18n.Court(z.L))
+	}
+	return Largeur - 16 - 14 - w
+}()
+
+// large : syllabe hangul, idéogramme ou kana, environ un cadratin de large.
+func large(r rune) bool {
+	return unicode.In(r, unicode.Hangul, unicode.Han, unicode.Hiragana, unicode.Katakana) || (r >= 0xFF01 && r <= 0xFF60)
+}
+
+// Coreen : le texte contient du hangul (le peintre choisit alors Malgun Gothic).
+func Coreen(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Hangul, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// LargeurTexte : estimation large d'un texte de taille px (Segoe UI 12 px ≈ 6,3 px
+// par caractère latin, estimé 6,5 ; Malgun Gothic 12 px : 12 px par syllabe hangul).
+func LargeurTexte(s string, taille int) int {
+	etroits, larges := 0, 0
+	for _, r := range s {
+		if large(r) {
+			larges++
+		} else {
+			etroits++
+		}
+	}
+	return (etroits*13 + larges*24) * taille / 24
+}
+
+// largeurLien : largeur d'un lien du pied (12 px), marge comprise.
+func largeurLien(s string) int { return LargeurTexte(s, 12) + 4 }

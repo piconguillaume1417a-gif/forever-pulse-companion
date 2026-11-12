@@ -4,6 +4,7 @@ package winui
 
 import (
 	"math"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -47,6 +48,7 @@ var (
 	pBitBlt              = gdi32.NewProc("BitBlt")
 	pSetBkMode           = gdi32.NewProc("SetBkMode")
 	pDrawText            = user32.NewProc("DrawTextW")
+	pGetTextExtent       = gdi32.NewProc("GetTextExtentPoint32W")
 	pDrawIconEx          = user32.NewProc("DrawIconEx")
 	pDestroyIcon         = user32.NewProc("DestroyIcon")
 )
@@ -65,8 +67,8 @@ func bgr(c vue.Couleur) uintptr {
 }
 
 type clePolice struct {
-	taille            int
-	gras, sou, glyphe bool
+	taille                    int
+	gras, sou, glyphe, coreen bool
 }
 
 type peintre struct {
@@ -118,6 +120,14 @@ func (p *peintre) police(k clePolice) uintptr {
 	face, poids := "Segoe UI", 400
 	if k.gras {
 		face, poids = "Segoe UI Semibold", 600
+	}
+	// Texte coréen : Malgun Gothic (livrée avec Windows), en gras 700 (malgunbd) ;
+	// Segoe UI n'a pas de hangul et le repli de GDI n'est pas garanti.
+	if k.coreen {
+		face = "Malgun Gothic"
+		if k.gras {
+			poids = 700
+		}
 	}
 	if k.glyphe {
 		face, poids = "Segoe MDL2 Assets", 400
@@ -257,7 +267,8 @@ const (
 )
 
 func (p *peintre) texte(hdc uintptr, o vue.Op) {
-	h := p.police(clePolice{taille: o.Taille, gras: o.Gras, sou: o.Souligne, glyphe: o.Genre == vue.OpGlyphe})
+	glyphe := o.Genre == vue.OpGlyphe
+	h := p.police(clePolice{taille: o.Taille, gras: o.Gras, sou: o.Souligne, glyphe: glyphe, coreen: !glyphe && vue.Coreen(o.Texte)})
 	old, _, _ := pSelectObject.Call(hdc, h)
 	pSetTextColor.Call(hdc, bgr(o.Couleur))
 	rc := struct{ L, T, R, B int32 }{int32(p.d(o.R.X)), int32(p.d(o.R.Y)), int32(p.d(o.R.X + o.R.W)), int32(p.d(o.R.Y + o.R.H))}
@@ -273,7 +284,42 @@ func (p *peintre) texte(hdc uintptr, o vue.Op) {
 	case vue.Droite:
 		flags |= dtRight
 	}
-	s, _ := windows.UTF16FromString(o.Texte)
+	texte := o.Texte
+	if o.Lignes && o.Genre == vue.OpTexte && vue.Coreen(texte) {
+		texte = p.couper(hdc, texte, int(rc.R-rc.L))
+	}
+	s, _ := windows.UTF16FromString(texte)
 	pDrawText.Call(hdc, uintptr(unsafe.Pointer(&s[0])), ^uintptr(0), uintptr(unsafe.Pointer(&rc)), flags)
 	pSelectObject.Call(hdc, old)
+}
+
+// couper : retours à la ligne aux espaces seulement. DrawText coupe le hangul entre
+// deux syllabes, au milieu d'un mot ; le coréen se coupe entre les mots (comme
+// word-break: keep-all). Un mot plus large que la ligne reste coupé par DrawText.
+func (p *peintre) couper(hdc uintptr, s string, largeur int) string {
+	mesure := func(t string) int {
+		u, _ := windows.UTF16FromString(t)
+		var taille struct{ CX, CY int32 }
+		pGetTextExtent.Call(hdc, uintptr(unsafe.Pointer(&u[0])), uintptr(len(u)-1), uintptr(unsafe.Pointer(&taille)))
+		return int(taille.CX)
+	}
+	var b strings.Builder
+	for i, para := range strings.Split(s, "\n") {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		ligne := ""
+		for _, mot := range strings.Fields(para) {
+			if ligne != "" && mesure(ligne+" "+mot) > largeur {
+				b.WriteString(ligne + "\n")
+				ligne = mot
+			} else if ligne != "" {
+				ligne += " " + mot
+			} else {
+				ligne = mot
+			}
+		}
+		b.WriteString(ligne)
+	}
+	return b.String()
 }

@@ -10,7 +10,7 @@ var ko = map[string]string{
 	"btn.installations":   "설치 관리",
 	"tip.installations":   "사이트의 계정 페이지를 엽니다: 연결된 설치 확인 및 권한 취소.",
 	"connect.pending":     "확인 대기 중 — 코드 %s",
-	"connect.compare":     "사이트에서 확인을 기다리는 중입니다. 페이지에 이 코드가 표시되는지 확인하세요:",
+	"connect.compare":     "사이트에서 확인을 기다리는 중입니다. 페이지의 코드와 같은지 확인하세요:",
 	"connect.connected":   "연결됨: %s",
 	"connect.cancelled":   "연결이 취소되었습니다%s",
 	"connect.expired":     "요청이 만료되었습니다. 다시 연결하세요%s",

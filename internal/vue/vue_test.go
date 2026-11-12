@@ -70,7 +70,7 @@ func TestMiseEnPage(t *testing.T) {
 						}
 					}
 				}
-				for _, id := range []int{Envoyer, Installations, Journal, Page, Dossier, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN} {
+				for _, id := range []int{Envoyer, Installations, Journal, Page, Dossier, Demarrage, Effacer, Desinstaller, Reduire, Quitter, LangueFR, LangueEN, LangueKO} {
 					if !vus[id] {
 						t.Errorf("commande %d absente", id)
 					}
@@ -102,6 +102,96 @@ func TestNombre(t *testing.T) {
 	i18n.Set(i18n.EN)
 	if Nombre(51767) != "51,767" {
 		t.Fatal(Nombre(51767))
+	}
+	i18n.Set(i18n.KO)
+	if Nombre(51767) != "51,767" || Nombre(-1234567) != "-1,234,567" {
+		t.Fatal(Nombre(51767), Nombre(-1234567))
+	}
+}
+
+// Le sélecteur a une case par langue de la table, dans son ordre, et chaque case
+// renvoie sa langue.
+func TestSelecteurDeLangue(t *testing.T) {
+	if len(zonesLangue) != len(i18n.Toutes) {
+		t.Fatalf("%d cases pour %d langues", len(zonesLangue), len(i18n.Toutes))
+	}
+	for i, z := range zonesLangue {
+		if z.L != i18n.Toutes[i] {
+			t.Errorf("case %d : %s au lieu de %s", i, z.L, i18n.Toutes[i])
+		}
+		if l, ok := LangueDe(z.ID); !ok || l != z.L {
+			t.Errorf("zone %d : %s", z.ID, l)
+		}
+	}
+	if _, ok := LangueDe(Envoyer); ok {
+		t.Error("Envoyer n'est pas une langue")
+	}
+	defer i18n.Set(i18n.FR)
+	i18n.Set(i18n.KO)
+	ops, zones, _, _ := Construire(Modele{Pret: true, Code: "allsent"}, Interaction{Survol: -1, Appui: -1}, Clair())
+	var cases []Rect
+	for _, z := range zones {
+		if _, ok := LangueDe(z.ID); ok {
+			cases = append(cases, z.R)
+			if !strings.Contains(z.Bulle, i18n.Nom(i18n.KO)) && z.ID == LangueKO {
+				t.Errorf("infobulle %q", z.Bulle)
+			}
+		}
+	}
+	if len(cases) != len(i18n.Toutes) {
+		t.Fatal(cases)
+	}
+	for i := 1; i < len(cases); i++ {
+		if cases[i].X != cases[i-1].X+cases[i-1].W {
+			t.Errorf("cases non contiguës : %+v", cases)
+		}
+	}
+	trouve := false
+	for _, o := range ops {
+		if o.Genre == OpTexte && o.Texte == "한국어" {
+			trouve = true
+			if LargeurTexte(o.Texte, o.Taille) > o.R.W {
+				t.Errorf("« 한국어 » déborde : %+v", o.R)
+			}
+		}
+	}
+	if !trouve {
+		t.Error("case « 한국어 » absente")
+	}
+}
+
+// En coréen, chaque libellé d'une ligne tient dans sa case (estimation large :
+// 1 cadratin par syllabe hangul) ; seuls les textes de données (chemins, messages)
+// peuvent finir en « … ».
+func TestCoreenTientDansLaFenetre(t *testing.T) {
+	defer i18n.Set(i18n.FR)
+	for _, l := range []i18n.Lang{i18n.KO} {
+		i18n.Set(l)
+		donnees := map[string]bool{}
+		for _, m := range modeles() {
+			donnees[m.Message], donnees[m.Dossier], donnees[m.DernierEnvoi], donnees[m.Connection] = true, true, true, true
+			for _, p := range m.Portees {
+				donnees[p.Nom] = true
+			}
+			ops, _, _, _ := Construire(m, Interaction{Survol: -1, Appui: -1}, Clair())
+			for _, o := range ops {
+				if o.Genre != OpTexte || o.Lignes || donnees[o.Texte] || o.Texte == "Forever Pulse Companion" || strings.HasPrefix(o.Texte, "v") {
+					continue
+				}
+				if w := LargeurTexte(o.Texte, o.Taille); w > o.R.W {
+					t.Errorf("%s : %q (%d px estimés) dépasse sa case de %d px", l, o.Texte, w, o.R.W)
+				}
+			}
+		}
+	}
+}
+
+func TestLargeurTexte(t *testing.T) {
+	if largeurLien("Effacer les données…") != len([]rune("Effacer les données…"))*13/2+4 {
+		t.Error("estimation latine modifiée")
+	}
+	if LargeurTexte("한국어", 12) != 36 || !Coreen("Forever Pulse에 연결") || Coreen("Connect") {
+		t.Error(LargeurTexte("한국어", 12))
 	}
 }
 
