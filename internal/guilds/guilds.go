@@ -24,6 +24,9 @@ type Member struct {
 	Level  int    `json:"level"`
 	Class  string `json:"class"`
 	Online *bool  `json:"online"`
+	// RaceID is the client ChrRaces ID from the addon's local race block.
+	// It is not part of the snapshot ID: surveys keep their batch IDs.
+	RaceID int `json:"race_id,omitempty"`
 }
 type Scope struct {
 	Realm   int64  `json:"realm_id"`
@@ -99,8 +102,9 @@ func Decode(t *lua.Table, scopes *lua.Table, now time.Time) (*Snapshot, error) {
 		return nil, bad
 	}
 	seen := map[string]bool{}
+	blockOf := map[string]int{}
 	connected, unknown := 0, 0
-	for _, b := range blocks.List() {
+	for bi, b := range blocks.List() {
 		str, ok := b.(string)
 		if !ok || len(str) > 32768 {
 			return nil, bad
@@ -115,6 +119,7 @@ func Decode(t *lua.Table, scopes *lua.Table, now time.Time) (*Snapshot, error) {
 				return nil, bad
 			}
 			seen[c[0]] = true
+			blockOf[c[0]] = bi
 			m := Member{GUID: c[0], Name: c[1], Level: lv, Class: c[3]}
 			switch c[4] {
 			case "1":
@@ -146,7 +151,55 @@ func Decode(t *lua.Table, scopes *lua.Table, now time.Time) (*Snapshot, error) {
 	p, _ := json.Marshal(s)
 	h := sha256.Sum256(p)
 	s.ID = hex.EncodeToString(h[:])
+	s.attachRaces(lua.AsTable(t.Get("races")), blockOf)
 	return &s, nil
+}
+
+// attachRaces reads the optional local race blocks (`GUID|raceID` lines,
+// aligned with `blocs`). Race is optional evidence: a malformed race block
+// is ignored as a whole and never refuses the membership snapshot.
+func (s *Snapshot) attachRaces(races *lua.Table, blockOf map[string]int) {
+	if races == nil || len(races.Str) != 0 || len(races.Other) != 0 || len(races.List()) != len(races.Int) {
+		return
+	}
+	byGUID := map[string]int{}
+	for bi, b := range races.List() {
+		str, ok := b.(string)
+		if !ok || len(str) > 32768 {
+			continue
+		}
+		found := map[string]int{}
+		valid := true
+		for _, row := range strings.Split(str, "\n") {
+			if row == "" {
+				continue
+			}
+			c := strings.Split(row, "|")
+			if len(c) != 2 {
+				valid = false
+				break
+			}
+			id, e := strconv.Atoi(c[1])
+			at, member := blockOf[c[0]]
+			if e != nil || id < 1 || id > 2147483647 || !member || at != bi {
+				valid = false
+				break
+			}
+			if _, dup := found[c[0]]; dup {
+				valid = false
+				break
+			}
+			found[c[0]] = id
+		}
+		if valid {
+			for g, id := range found {
+				byGUID[g] = id
+			}
+		}
+	}
+	for i := range s.Members {
+		s.Members[i].RaceID = byGUID[s.Members[i].GUID]
+	}
 }
 func (s Snapshot) Key() string {
 	h := sha256.Sum256([]byte(s.Scope.Region + "\n" + s.ScopeID + "\n" + s.Guild))
