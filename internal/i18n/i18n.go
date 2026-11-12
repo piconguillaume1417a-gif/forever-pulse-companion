@@ -119,6 +119,7 @@ var msgs = map[string][2]string{
 	"hint.starting": {"Lecture de la base locale et des fichiers de l'addon…", "Reading the local database and the addon files…"},
 	"hint.allsent":  {"Le compagnon surveille ForeverPulse.lua et envoie chaque nouveau relevé tout seul.", "The companion watches ForeverPulse.lua and uploads every new reading on its own."},
 	"hint.rejected": {"Consultez le journal. Les autres relevés continuent de partir.", "Check the log. Other readings continue uploading."},
+	"hint.working":  {"Le compagnon envoie chaque nouveau relevé tout seul. Les anciens refus restent comptés dans les détails.", "The companion uploads every new reading on its own. Past refusals stay counted in the details."},
 	"hint.pending":  {"L'envoi se fait tout seul ; « Envoyer maintenant » le lance sans attendre.", "Uploads happen on their own; “Send now” starts one right away."},
 	"hint.notoken":  {"Cliquez sur « Connecter à Forever Pulse », puis confirmez cette installation dans votre navigateur.", "Click “Connect to Forever Pulse”, then approve this installation in your browser."},
 	"hint.token":    {"L’accès a été refusé ou révoqué. Cliquez sur « Connecter à Forever Pulse » pour vous reconnecter.", "Access was refused or revoked. Click “Connect to Forever Pulse” to reconnect."},
@@ -176,6 +177,7 @@ var msgs = map[string][2]string{
 
 	"st.statspending": {"%d fiches de statistiques en attente d'envoi", "%d statistics sheets waiting to be sent"},
 	"st.allsent":      {"Tout est envoyé", "Everything has been sent"},
+	"st.working":      {"Fonctionne normalement", "Working normally"},
 	"st.rejected":     {"%d lots et %d fiches refusés", "%d batches and %d sheets rejected"},
 	"st.lastsend":     {"Dernier envoi : %s, %s lots, %s personnages", "Last upload: %s, %s batches, %s characters"},
 	"st.cumul":        {"%s : %d personnages distincts observés depuis le %s", "%s: %d distinct characters observed since %s"},
