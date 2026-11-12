@@ -14,6 +14,8 @@ import (
 	"time"
 	"unsafe"
 
+	"golang.org/x/sys/windows"
+
 	"wowsync/internal/i18n"
 	"wowsync/internal/vue"
 )
@@ -236,4 +238,59 @@ func rendre(t *testing.T, dpi, wl, hl int, ops []vue.Op) image.Image {
 		img.Set(i%w, i/w, color.RGBA{buf[i*4+2], buf[i*4+1], buf[i*4], 255})
 	}
 	return img
+}
+
+// Un texte de plusieurs lignes tient en entier dans sa case à chaque échelle de
+// Windows : avec DT_EDITCONTROL, une dernière ligne partielle n'est pas dessinée
+// (« Lancer au démarrage de W… » à 144 ppp, rc.17).
+func TestLignesEntieresAChaqueEchelle(t *testing.T) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	defer i18n.Set(i18n.FR)
+	dc, _, _ := pCreateCompatDCTst.Call(0)
+	if dc == 0 {
+		t.Skip("pas de contexte GDI")
+	}
+	defer pDeleteDC.Call(dc)
+	modeles := []vue.Modele{
+		{Pret: true, Code: "allsent", Message: "m", Demarrage: true, Dossier: "D:/WoW", DossierEtat: vue.DossierPret},
+		{Pret: true, Code: "notoken", Message: "m", Dossier: "D:/WoW"},
+		{Pret: true, Code: "working", Message: "m", Dossier: "D:/WoW"},
+		{Pret: true, Code: "body", Message: "m", Dossier: "D:/WoW"},
+		{Pret: false},
+	}
+	for _, l := range i18n.Toutes {
+		i18n.Set(l)
+		ms := append([]vue.Modele{}, modeles...)
+		c, code := vue.Connexion("notoken", "pending", "0E26CF55")
+		ms = append(ms, vue.Modele{Pret: true, Code: "notoken", Connection: c, ConnectionCode: code},
+			vue.Modele{Pret: true, Code: "token", Connection: i18n.T("connect.revoked", "")})
+		for _, dpi := range []int{96, 120, 144, 168, 192} {
+			p := nouveauPeintre(dpi)
+			for _, m := range ms {
+				ops, _, _, _ := vue.Construire(m, vue.Interaction{Survol: -1, Appui: -1, Focus: -1}, vue.Clair())
+				for _, o := range ops {
+					if o.Genre != vue.OpTexte || !o.Lignes {
+						continue
+					}
+					h := p.police(clePolice{taille: o.Taille, gras: o.Gras, coreen: vue.Coreen(o.Texte)})
+					old, _, _ := pSelectObject.Call(dc, h)
+					texte := o.Texte
+					largeur := p.d(o.R.X+o.R.W) - p.d(o.R.X)
+					if vue.Coreen(texte) {
+						texte = p.couper(dc, texte, largeur)
+					}
+					s, _ := windows.UTF16FromString(texte)
+					rc := struct{ L, T, R, B int32 }{0, 0, int32(largeur), 0}
+					pDrawText.Call(dc, uintptr(unsafe.Pointer(&s[0])), ^uintptr(0), uintptr(unsafe.Pointer(&rc)),
+						dtWordBreak|dtNoPrefix|dtEditControl|0x400 /*DT_CALCRECT*/)
+					pSelectObject.Call(dc, old)
+					if dispo := p.d(o.R.Y+o.R.H) - p.d(o.R.Y); int(rc.B) > dispo {
+						t.Errorf("%s %d ppp : %q demande %d px, case de %d px", l, dpi, o.Texte, rc.B, dispo)
+					}
+				}
+			}
+			p.liberer()
+		}
+	}
 }

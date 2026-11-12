@@ -307,7 +307,8 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 	}
 	glyphe(Rect{30, 113, 40, 40}, g, 18, ce)
 	texte(Rect{84, 106, W - 84 - 28, 24}, msg, 15, true, th.Texte, Gauche)
-	add(Op{Genre: OpTexte, R: Rect{84, 130, W - 84 - 28, 34}, Texte: i18n.T("hint." + code), Taille: 12,
+	// 36 px : la seconde ligne reste dessinée à 175 % (34 px la masquaient).
+	add(Op{Genre: OpTexte, R: Rect{84, 130, W - 84 - 28, 36}, Texte: i18n.T("hint." + code), Taille: 12,
 		Couleur: th.Doux, Lignes: true})
 
 	// Trois compteurs.
@@ -503,7 +504,8 @@ func Construire(m Modele, in Interaction, th Theme) (ops []Op, zones []Zone, lar
 		if s := i18n.T("win.autostart"); LargeurTexte(s, 13) <= tw {
 			texte(Rect{80, yb, tw, 52}, s, 13, false, th.Texte, Gauche)
 		} else {
-			add(Op{Genre: OpTexte, R: Rect{80, yb + 8, tw, 36}, Texte: s, Taille: 13, Couleur: th.Texte, Lignes: true})
+			// 40 px : deux lignes entières à toutes les échelles (36 px masquaient la seconde à 150 %).
+			add(Op{Genre: OpTexte, R: Rect{80, yb + 8, tw, 40}, Texte: s, Taille: 13, Couleur: th.Texte, Lignes: true})
 		}
 		zones = append(zones, Zone{ID: Demarrage, R: Rect{24, yb + 8, xLangues - 24 - 6 - 24, 36}, Bulle: i18n.T("tip.autostart")})
 	}
