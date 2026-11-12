@@ -4,7 +4,10 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
+	"unicode"
 )
 
 // verbe : un verbe de format de fmt (%s, %d, %[2]s, %5.1f…) ou « %% ».
@@ -140,5 +143,65 @@ func TestVerbesIndexes(t *testing.T) {
 	}
 	if _, p := arguments("100 %%"); p != 1 {
 		t.Fatal(p)
+	}
+}
+
+// K4 : après un verbe de format, la valeur peut finir par une consonne ou une
+// voyelle ; une particule variable collée (%s이, %d를, %s로…) serait fausse une
+// fois sur deux. Forme double (이(가)) ou tournure sans particule seulement.
+var particuleVariable = regexp.MustCompile(`%(?:\[\d+\])?[-+# 0]*\d*(?:\.\d+)?[a-zA-Z](이|가|을|를|은|는|과|와|으로|로|이다|이며|이고)(?:[\s.,!?:;)…”]|$)`)
+
+// K6 : en coréen, latin seulement pour les marques, sigles, noms de fichiers et
+// de dossiers du jeu.
+var latin = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_.\-/*]*`)
+
+var latinPermis = map[string]bool{
+	"Forever": true, "Pulse": true, "Companion": true, "PC": true, "Windows": true, "Esc": true,
+	"World": true, "of": true, "Warcraft": true, "ForeverPulse.lua": true, "config.toml": true,
+	"wow_dir": true, "_retail_": true, "_classic_beta_": true, "/reload": true, "reload": true,
+	"forever-pulse.com": true, "forever-pulse.com/account/companion": true,
+	"_": true, "WTF": true, "Account": true, "SavedVariables": true,
+}
+
+func TestCoreen(t *testing.T) {
+	for k, s := range ko {
+		if m := particuleVariable.FindString(s); m != "" {
+			t.Errorf("ko/%s : particule variable après un paramètre (%q)", k, m)
+		}
+		for _, r := range s {
+			switch {
+			case unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana):
+				t.Errorf("ko/%s : hanja ou kana %q", k, r)
+			case r >= 0x3000 && r <= 0x303F, r >= 0xFF01 && r <= 0xFF60:
+				t.Errorf("ko/%s : ponctuation pleine chasse %q", k, r)
+			}
+		}
+		if k == "fmt.date" || k == "fmt.datetime" || k == "fmt.time" {
+			continue
+		}
+		for _, mot := range latin.FindAllString(verbe.ReplaceAllString(strings.ReplaceAll(s, `\`, " "), " "), -1) {
+			mot = strings.TrimRight(mot, ".")
+			if !latinPermis[mot] && !strings.HasPrefix(mot, "_") {
+				t.Errorf("ko/%s : mot latin %q hors liste", k, mot)
+			}
+		}
+	}
+}
+
+func TestDatesCoreennes(t *testing.T) {
+	defer Set(FR)
+	Set(KO)
+	d := time.Date(2026, 9, 18, 15, 4, 0, 0, time.UTC)
+	if g := d.Format(T("fmt.date")); g != "2026. 9. 18." {
+		t.Error(g)
+	}
+	if g := d.Format(T("fmt.datetime")); g != "9월 18일 15:04" {
+		t.Error(g)
+	}
+	if g := T("st.pending", 3); g != "전송 대기 중인 묶음 3개" {
+		t.Error(g)
+	}
+	if !particuleVariable.MatchString("버전 %s로 업데이트") || particuleVariable.MatchString("%s에 다시 시도") || particuleVariable.MatchString("%s이(가) 준비됨") {
+		t.Error("contrôle K4")
 	}
 }

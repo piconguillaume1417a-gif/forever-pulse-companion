@@ -1,6 +1,6 @@
 package i18n
 
-// en : 152 textes.
+// en : textes anglais (repli de toutes les langues).
 var en = map[string]string{
 	"err.census_slice":    "Upload still in progress; remaining readings will resume automatically.",
 	"btn.connect":         "Connect to Forever Pulse",
@@ -110,6 +110,7 @@ var en = map[string]string{
 	"fmt.date":        "Jan 2, 2006",
 	"fmt.datetime":    "Jan 2, 15:04",
 	"fmt.time":        "15:04",
+	"fmt.thousands":   ",",
 	"notify.sent":     "Upload complete",
 	"notify.notoken":  "%s: connection needed",
 	"notify.howto":    "Click “Connect to Forever Pulse”, then confirm in your browser.",

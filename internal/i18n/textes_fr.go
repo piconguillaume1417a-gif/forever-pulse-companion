@@ -1,6 +1,6 @@
 package i18n
 
-// fr : 152 textes.
+// fr : textes français.
 var fr = map[string]string{
 	"err.census_slice":    "Envoi encore en cours ; les relevés restants seront repris automatiquement.",
 	"btn.connect":         "Connecter à Forever Pulse",
@@ -110,6 +110,7 @@ var fr = map[string]string{
 	"fmt.date":        "02/01/2006",
 	"fmt.datetime":    "02/01 15:04",
 	"fmt.time":        "15:04",
+	"fmt.thousands":   " ", // séparateur des milliers (espace insécable)
 	"notify.sent":     "Envoi terminé",
 	"notify.notoken":  "%s : connexion nécessaire",
 	"notify.howto":    "Cliquez sur « Connecter à Forever Pulse », puis confirmez dans votre navigateur.",

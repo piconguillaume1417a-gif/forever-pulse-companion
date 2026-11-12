@@ -20,7 +20,7 @@ type Config struct {
 	WowDir           string
 	StartWithWindows bool
 	PollSeconds      int
-	Language         string // « fr », « en », ou vide : anglais
+	Language         string // « fr », « en », « ko », ou vide : anglais
 	// AutoUpdate : 0.10.0, vérification quotidienne des versions publiées (vrai par
 	// défaut ; une clé absente, comme dans les fichiers antérieurs, vaut vrai).
 	AutoUpdate bool
@@ -273,7 +273,7 @@ start_with_windows = %t
 # Intervalle de surveillance du fichier, en secondes (300 par défaut, 3600 au plus).
 # Un changement repéré est confirmé 3 s plus tard, puis traité.
 poll_seconds = %d
-# Langue de l'interface : 'fr', 'en', ou '' pour l'anglais.
+# Langue de l'interface : 'fr', 'en', 'ko', ou '' pour l'anglais.
 language = %s
 # Mise à jour automatique : vérification quotidienne des versions signées publiées.
 auto_update = %t

@@ -18,6 +18,7 @@ type Lang string
 const (
 	FR Lang = "fr"
 	EN Lang = "en"
+	KO Lang = "ko" // rc.17
 )
 
 // langue : une ligne de la table des langues.
@@ -32,6 +33,7 @@ type langue struct {
 var langues = []langue{
 	{FR, "Français", "FR", fr},
 	{EN, "English", "EN", en},
+	{KO, "한국어", "한국어", ko},
 }
 
 // parCode : index de langues ; Toutes : les codes, dans l'ordre de la liste de choix.
