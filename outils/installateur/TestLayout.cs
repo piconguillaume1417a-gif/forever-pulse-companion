@@ -65,7 +65,7 @@ internal static class TestLayout
                     float scale;
                     using (Graphics graphics = window.CreateGraphics()) scale = graphics.DpiX / 96F;
                     window.ClientSize = new Size((int)(width * scale), (int)(480 * scale));
-                    window.Font = new Font("Segoe UI", fontSize);
+                    window.Font = new Font(args[1] == "ko-KR" ? "Malgun Gothic" : "Segoe UI", fontSize);
                     TextBox path = FindPath(window);
                     Require(path != null, "Installation path is missing");
                     if (length > 0)
@@ -102,6 +102,8 @@ internal static class TestLayout
                     Label status = (Label)windowType.GetField("status", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(window);
                     status.Text = args[1] == "fr-FR"
                         ? "Installation terminée. Cliquez sur Ouvrir pour lancer la version 0.10.0-rc.6, ou sur Fermer pour la lancer plus tard."
+                        : args[1] == "ko-KR"
+                        ? "설치가 완료되었습니다(버전 0.10.0-rc.6). 지금 실행하려면 “열기”, 나중에 실행하려면 “닫기”를 클릭하세요."
                         : "Setup complete. Click Open to start version 0.10.0-rc.6, or Close to start it later.";
                     window.PerformLayout();
                     Application.DoEvents();

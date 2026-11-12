@@ -17,9 +17,11 @@ using System.Windows.Forms;
 
 internal static class Program
 {
-    // French when Windows is in French, English otherwise (0.10.0).
-    internal static readonly bool French = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "fr";
-    internal static string T(string fr, string en) { return French ? fr : en; }
+    // French or Korean when Windows is in that language, English otherwise (0.10.0 ; rc.17 : Korean).
+    internal static readonly string Language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    internal static readonly bool French = Language == "fr";
+    internal static readonly bool Korean = Language == "ko";
+    internal static string T(string fr, string en, string ko) { return French ? fr : Korean ? ko : en; }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     internal static extern IntPtr FindWindow(string className, string title);
@@ -78,11 +80,11 @@ internal static class Program
         using (Stream input = Assembly.GetExecutingAssembly().GetManifestResourceStream("companion.msi"))
         using (Stream output = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            if (input == null) throw new InvalidDataException(T("Le paquet d'installation est absent.", "The installation package is missing."));
+            if (input == null) throw new InvalidDataException(T("Le paquet d'installation est absent.", "The installation package is missing.", "설치 패키지가 없습니다."));
             input.CopyTo(output);
         }
         if (Hash(file) != PackageInfo.MsiHash || MsiVerifyPackage(file) != 0)
-            throw new InvalidDataException(T("Le paquet d'installation est endommagé. Téléchargez de nouveau l'installateur.", "The installation package is damaged. Download the installer again."));
+            throw new InvalidDataException(T("Le paquet d'installation est endommagé. Téléchargez de nouveau l'installateur.", "The installation package is damaged. Download the installer again.", "설치 패키지가 손상되었습니다. 설치 프로그램을 다시 다운로드하세요."));
     }
 
     [STAThread]
@@ -170,11 +172,12 @@ internal sealed class SetupWindow : Form
     internal SetupWindow()
     {
         SuspendLayout();
-        Text = Program.T("Installation · Forever Pulse Companion ", "Setup · Forever Pulse Companion ") + PackageInfo.Version;
+        Text = Program.T("Installation · Forever Pulse Companion ", "Setup · Forever Pulse Companion ", "설치 · Forever Pulse Companion ") + PackageInfo.Version;
         AutoScaleDimensions = new SizeF(96F, 96F);
         AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(650, 540);
-        Font = new Font("Segoe UI", 10);
+        // Korean: Malgun Gothic, shipped with Windows (Segoe UI has no hangul).
+        Font = new Font(Program.Korean ? "Malgun Gothic" : "Segoe UI", 10);
         MinimumSize = new Size(550, 480);
         FormBorderStyle = FormBorderStyle.Sizable;
         StartPosition = FormStartPosition.CenterScreen;
@@ -224,7 +227,7 @@ internal sealed class SetupWindow : Form
         subtitle.Dock = DockStyle.Fill;
         subtitle.Margin = Padding.Empty;
         subtitle.ForeColor = Color.FromArgb(193, 206, 228);
-        subtitle.Text = "Version " + PackageInfo.Version + " · Windows 11 · 64" + Program.T(" bits", "-bit");
+        subtitle.Text = "Version " + PackageInfo.Version + " · Windows 11 · 64" + Program.T(" bits", "-bit", "비트");
         header.Controls.Add(subtitle, 1, 1);
 
         // Rows follow their contents, including wrapped text at larger Windows scales.
@@ -243,29 +246,29 @@ internal sealed class SetupWindow : Form
         body.Padding = new Padding(30, 22, 30, 8);
         viewport.Controls.Add(body);
 
-        AddLabel(body, Program.T("Installer pour votre compte Windows", "Install for your Windows account"), true);
-        AddLabel(body, Program.T("Le Compagnon et ses guides seront ajoutés ici :", "The Companion and its guides will be added here:"), false);
+        AddLabel(body, Program.T("Installer pour votre compte Windows", "Install for your Windows account", "Windows 계정에 설치"), true);
+        AddLabel(body, Program.T("Le Compagnon et ses guides seront ajoutés ici :", "The Companion and its guides will be added here:", "Companion과 안내서가 여기에 추가됩니다:"), false);
         InstallPathBox path = new InstallPathBox();
         path.Name = "InstallPath";
         path.Dock = DockStyle.Top;
         path.Margin = new Padding(0, 0, 0, 18);
         path.Text = Program.InstallDirectory;
         path.ReadOnly = true;
-        path.AccessibleName = Program.T("Dossier d'installation", "Installation folder");
+        path.AccessibleName = Program.T("Dossier d'installation", "Installation folder", "설치 폴더");
         path.BackColor = Color.White;
         body.Controls.Add(path);
         AddLabel(body, Program.T("Votre configuration, votre connexion et vos relevés sont conservés.\nUn raccourci sera ajouté au menu Démarrer. Aucun droit administrateur.\nLe Compagnon se met ensuite à jour tout seul.",
-            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date."), false);
+            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date.", "설정, 연결, 기록은 유지됩니다.\n시작 메뉴에 바로 가기가 추가됩니다. 관리자 권한은 필요하지 않습니다.\n이후 Companion은 자동으로 업데이트됩니다."), false);
         desktop.AutoSize = true;
         desktop.Dock = DockStyle.Top;
         desktop.Margin = new Padding(0, 0, 0, 18);
-        desktop.Text = Program.T("Ajouter aussi un raccourci sur le Bureau", "Also add a desktop shortcut");
+        desktop.Text = Program.T("Ajouter aussi un raccourci sur le Bureau", "Also add a desktop shortcut", "바탕 화면에도 바로 가기 추가");
         desktop.Checked = true;
         body.Controls.Add(desktop);
         status.AutoSize = true;
         status.Dock = DockStyle.Top;
         status.Margin = new Padding(0, 0, 0, 18);
-        status.Text = Program.T("Si le Compagnon est ouvert, l'installation le fermera puis vous proposera de le rouvrir.", "If the Companion is open, setup will close it and then offer to open it again.");
+        status.Text = Program.T("Si le Compagnon est ouvert, l'installation le fermera puis vous proposera de le rouvrir.", "If the Companion is open, setup will close it and then offer to open it again.", "Companion이 열려 있으면 설치 프로그램이 종료한 뒤 다시 열 수 있도록 안내합니다.");
         body.Controls.Add(status);
         progress.Dock = DockStyle.Top;
         progress.Height = 12;
@@ -282,12 +285,12 @@ internal sealed class SetupWindow : Form
         close.AutoSize = true;
         close.MinimumSize = new Size(130, 40);
         close.Margin = new Padding(0, 0, 15, 0);
-        close.Text = Program.T("Fermer", "Close");
+        close.Text = Program.T("Fermer", "Close", "닫기");
         close.Click += delegate { Close(); };
         install.AutoSize = true;
         install.MinimumSize = new Size(133, 40);
         install.Margin = Padding.Empty;
-        install.Text = Program.T("Installer", "Install");
+        install.Text = Program.T("Installer", "Install", "설치");
         install.BackColor = Color.FromArgb(36, 88, 162);
         install.ForeColor = Color.White;
         install.FlatStyle = FlatStyle.Flat;
@@ -317,16 +320,16 @@ internal sealed class SetupWindow : Form
     {
         if (!complete && Program.CompanionRunning())
         {
-            if (MessageBox.Show(this, Program.T("Le Compagnon est ouvert. Le fermer maintenant pour l'installer ? Aucun relevé n'est perdu.", "The Companion is running. Close it now to install? No reading is lost."),
+            if (MessageBox.Show(this, Program.T("Le Compagnon est ouvert. Le fermer maintenant pour l'installer ? Aucun relevé n'est perdu.", "The Companion is running. Close it now to install? No reading is lost.", "Companion이 실행 중입니다. 지금 종료하고 설치하시겠습니까? 기록은 사라지지 않습니다."),
                     "Forever Pulse Companion", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
                 return;
-            status.Text = Program.T("Fermeture du Compagnon…", "Closing the Companion…");
+            status.Text = Program.T("Fermeture du Compagnon…", "Closing the Companion…", "Companion 종료 중…");
             install.Enabled = false;
             bool closed = await Task.Run(new Func<bool>(Program.QuitCompanion));
             install.Enabled = true;
             if (!closed)
             {
-                MessageBox.Show(this, Program.T("Le Compagnon ne s'est pas fermé. Choisissez Quitter dans le menu de son icône près de l'horloge, puis réessayez.", "The Companion did not close. Choose Quit in its icon menu next to the clock, then try again."),
+                MessageBox.Show(this, Program.T("Le Compagnon ne s'est pas fermé. Choisissez Quitter dans le menu de son icône près de l'horloge, puis réessayez.", "The Companion did not close. Choose Quit in its icon menu next to the clock, then try again.", "Companion이 종료되지 않았습니다. 시계 옆 아이콘 메뉴에서 “종료”를 선택한 다음 다시 시도하세요."),
                     "Forever Pulse Companion", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -338,19 +341,19 @@ internal sealed class SetupWindow : Form
                 Process.Start(new ProcessStartInfo(Path.Combine(Program.InstallDirectory, "ForeverPulseCompanion.exe")) { UseShellExecute = true });
                 Close();
             }
-            catch (Exception error) { MessageBox.Show(this, error.Message, Program.T("Ouverture impossible", "Cannot open"), MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception error) { MessageBox.Show(this, error.Message, Program.T("Ouverture impossible", "Cannot open", "열 수 없음"), MessageBoxButtons.OK, MessageBoxIcon.Error); }
             return;
         }
         if (!Program.Windows11())
         {
-            MessageBox.Show(this, Program.T("Cet installateur nécessite Windows 11 en 64 bits.", "This installer requires 64-bit Windows 11."), Program.T("Windows non compatible", "Unsupported Windows"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, Program.T("Cet installateur nécessite Windows 11 en 64 bits.", "This installer requires 64-bit Windows 11.", "이 설치 프로그램에는 64비트 Windows 11이 필요합니다."), Program.T("Windows non compatible", "Unsupported Windows", "지원되지 않는 Windows"), MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
         installing = true;
         install.Enabled = close.Enabled = desktop.Enabled = false;
         progress.Style = ProgressBarStyle.Marquee;
         progress.Visible = true;
-        status.Text = Program.T("Installation en cours…", "Installing…");
+        status.Text = Program.T("Installation en cours…", "Installing…", "설치 중…");
         string folder = Path.Combine(Path.GetTempPath(), "ForeverPulse-Setup-" + Guid.NewGuid().ToString("N"));
         string package = Path.Combine(folder, "companion.msi");
         string log = Path.Combine(folder, "installation.log");
@@ -372,18 +375,18 @@ internal sealed class SetupWindow : Form
                 }
             });
             if (result != 0 && result != 3010)
-                throw new InvalidOperationException(Program.T("Windows Installer a renvoyé le code ", "Windows Installer returned code ") + result + ".\n" + Program.T("Journal : ", "Log: ") + log);
+                throw new InvalidOperationException(Program.T("Windows Installer a renvoyé le code ", "Windows Installer returned code ", "Windows Installer 반환 코드: ") + result + ".\n" + Program.T("Journal : ", "Log: ", "로그: ") + log);
             string installed = Path.Combine(Program.InstallDirectory, "ForeverPulseCompanion.exe");
             if (Program.Hash(installed) != PackageInfo.CompanionHash)
-                throw new InvalidDataException(Program.T("Le fichier installé ne correspond pas à la version attendue.", "The installed file does not match the expected version.") + "\n" + Program.T("Journal : ", "Log: ") + log);
+                throw new InvalidDataException(Program.T("Le fichier installé ne correspond pas à la version attendue.", "The installed file does not match the expected version.", "설치된 파일이 예상한 버전과 일치하지 않습니다.") + "\n" + Program.T("Journal : ", "Log: ", "로그: ") + log);
             succeeded = complete = true;
-            install.Text = Program.T("Ouvrir", "Open");
-            status.Text = Program.T("Installation terminée. Cliquez sur Ouvrir pour lancer la version ", "Setup complete. Click Open to start version ") + PackageInfo.Version + Program.T(", ou sur Fermer pour la lancer plus tard.", ", or Close to start it later.");
+            install.Text = Program.T("Ouvrir", "Open", "열기");
+            status.Text = Program.T("Installation terminée. Cliquez sur Ouvrir pour lancer la version ", "Setup complete. Click Open to start version ", "설치가 완료되었습니다(버전 ") + PackageInfo.Version + Program.T(", ou sur Fermer pour la lancer plus tard.", ", or Close to start it later.", "). 지금 실행하려면 “열기”, 나중에 실행하려면 “닫기”를 클릭하세요.");
         }
         catch (Exception error)
         {
-            status.Text = Program.T("L'installation n'a pas abouti. Vous pouvez réessayer.", "Setup did not complete. You can try again.");
-            MessageBox.Show(this, error.Message, Program.T("Installation interrompue", "Setup interrupted"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+            status.Text = Program.T("L'installation n'a pas abouti. Vous pouvez réessayer.", "Setup did not complete. You can try again.", "설치가 완료되지 않았습니다. 다시 시도할 수 있습니다.");
+            MessageBox.Show(this, error.Message, Program.T("Installation interrompue", "Setup interrupted", "설치 중단됨"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
