@@ -109,9 +109,10 @@ internal static class TestLayout
                     float scale;
                     using (Graphics graphics = window.CreateGraphics()) scale = graphics.DpiX / 96F;
                     window.ClientSize = new Size((int)(width * scale), (int)(480 * scale));
-                    // The font family is the one Setup.cs chose for this language (never forced here).
-                    Require(window.Font.FontFamily.Name == (args[1] == "ko-KR" ? "Malgun Gothic" : "Segoe UI"),
-                        "Unexpected setup font: " + window.Font.FontFamily.Name);
+                    // The font family is the one Setup.cs chose for this language (never forced here);
+                    // English name, since FontFamily.Name follows the UI culture (맑은 고딕).
+                    Require(window.Font.FontFamily.GetName(1033) == (args[1] == "ko-KR" ? "Malgun Gothic" : "Segoe UI"),
+                        "Unexpected setup font: " + window.Font.FontFamily.GetName(1033));
                     window.Font = new Font(window.Font.FontFamily, fontSize);
                     TextBox path = FindPath(window);
                     Require(path != null, "Installation path is missing");
