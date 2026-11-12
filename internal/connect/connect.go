@@ -44,6 +44,33 @@ type Result struct {
 	Token          string    `json:"token"`
 	Account        string    `json:"account"`
 	InstallationID string    `json:"installation_id"`
+	// Received is the local time the response arrived and ServerTime the
+	// server's HTTP Date header (zero when absent or unreadable). Together they
+	// turn the server's absolute expiry into a remaining duration, so a PC
+	// clock that is minutes off cannot reject a valid request.
+	Received   time.Time `json:"-"`
+	ServerTime time.Time `json:"-"`
+}
+
+// maxRequestLife bounds how long a server-announced request may live,
+// whatever the clocks say (the server uses 15 minutes).
+const maxRequestLife = 15*time.Minute + 30*time.Second
+
+// localExpiry converts the server's expiry into local time. Without a usable
+// Date header it keeps the local budget: the server still enforces its own
+// expiry and answers expired_token when it is reached.
+func localExpiry(out Result, budget time.Time) (time.Time, bool) {
+	if out.Expires.IsZero() {
+		return time.Time{}, false
+	}
+	if out.ServerTime.IsZero() {
+		return budget, true
+	}
+	remaining := out.Expires.Sub(out.ServerTime)
+	if remaining <= 0 || remaining > maxRequestLife {
+		return time.Time{}, false
+	}
+	return minTime(budget, out.Received.Add(remaining)), true
 }
 type Client struct {
 	Site      string
@@ -114,6 +141,10 @@ func (c *Client) call(ctx context.Context, r Record, operation string) (Result, 
 	var out Result
 	if json.Unmarshal(raw, &out) != nil {
 		return out, errors.New("network")
+	}
+	out.Received = time.Now()
+	if d, e := http.ParseTime(resp.Header.Get("Date")); e == nil {
+		out.ServerTime = d
 	}
 	if resp.StatusCode == 404 {
 		return out, errors.New("unavailable")
@@ -270,10 +301,11 @@ func (c *Client) run(ctx context.Context, r Record, open bool) error {
 			if op == "start" {
 				expected := strings.TrimRight(c.Site, "/") + "/account/companion/connect?request=" + r.ID
 				u, e := url.Parse(out.URI)
-				if e != nil || u.String() != expected || out.Code != Code(r.Verifier) || out.Expires.IsZero() || out.Expires.After(r.Expires.Add(30*time.Second)) {
+				expires, ok := localExpiry(out, r.Expires)
+				if e != nil || u.String() != expected || out.Code != Code(r.Verifier) || !ok {
 					return errors.New("network")
 				}
-				r.Expires = minTime(r.Expires, out.Expires)
+				r.Expires = expires
 				if e = c.save(r); e != nil {
 					return errors.New("vault")
 				}

@@ -228,7 +228,13 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			err = connector.Start(cctx)
 		}
 		if err != nil && cctx.Err() == nil {
-			connector.Status("unavailable", "")
+			// A Windows credential failure has its own message: "try again" would
+			// not help, and it is not a website problem.
+			if err.Error() == "vault" {
+				connector.Status("vault", "")
+			} else {
+				connector.Status("unavailable", "")
+			}
 		}
 	}
 	annulerConnexion := func() {
