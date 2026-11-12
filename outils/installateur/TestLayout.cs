@@ -29,6 +29,50 @@ internal static class TestLayout
         }
     }
 
+    private static bool Hangul(char c) { return c >= '\uAC00' && c <= '\uD7A3'; }
+
+    // Break opportunities of Windows (DrawText WordBreak): a space, or either side of a
+    // CJK character. Hangul counts as CJK there, so Windows may end a line between two
+    // syllables of one Korean word; the setup must break Korean at spaces only.
+    private static bool Breakable(string s, int i)
+    {
+        return s[i - 1] == ' ' || s[i] == ' ' || s[i - 1] >= '\u2E80' || s[i] >= '\u2E80';
+    }
+
+    private static void CheckHangulBreaks(Control parent)
+    {
+        foreach (Control control in parent.Controls)
+        {
+            CheckHangulBreaks(control);
+            Label label = control as Label;
+            if (label == null || !label.Visible || label.Text.Length == 0) continue;
+            // A label may draw a text of its own (Korean pre-wrapped at spaces).
+            PropertyInfo drawn = label.GetType().GetProperty("DrawnText");
+            string text = drawn != null ? (string)drawn.GetValue(label, null) : label.Text;
+            int width = label.ClientSize.Width - label.Padding.Horizontal;
+            const TextFormatFlags single = TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
+            foreach (string paragraph in text.Split('\n'))
+            {
+                int start = 0;
+                while (start < paragraph.Length)
+                {
+                    int end = start + 1;
+                    while (end < paragraph.Length &&
+                        TextRenderer.MeasureText(paragraph.Substring(start, end + 1 - start), label.Font, new Size(int.MaxValue, int.MaxValue), single).Width <= width)
+                        end++;
+                    if (end >= paragraph.Length) break;
+                    int cut = end;
+                    while (cut > start + 1 && !Breakable(paragraph, cut)) cut--;
+                    if (!Breakable(paragraph, cut)) cut = end;
+                    Require(!(Hangul(paragraph[cut - 1]) && Hangul(paragraph[cut])),
+                        "Korean word broken between two syllables: " + paragraph.Substring(start, cut - start) + " | " + paragraph.Substring(cut));
+                    start = cut;
+                    while (start < paragraph.Length && paragraph[start] == ' ') start++;
+                }
+            }
+        }
+    }
+
     private static TextBox FindPath(Control parent)
     {
         foreach (Control control in parent.Controls)
@@ -68,7 +112,10 @@ internal static class TestLayout
                     window.Font = new Font(args[1] == "ko-KR" ? "Malgun Gothic" : "Segoe UI", fontSize);
                     TextBox path = FindPath(window);
                     Require(path != null, "Installation path is missing");
-                    if (length > 0)
+                    if (length == 0)
+                        // Short, realistic path without the name of the Windows account.
+                        path.Text = @"C:\Users\Joueur\AppData\Local\Programs\ForeverPulseCompanion";
+                    else
                     {
                         const string prefix = @"C:\Users\";
                         const string suffix = @"\AppData\Local\Programs\ForeverPulseCompanion";
@@ -78,6 +125,7 @@ internal static class TestLayout
                     window.PerformLayout();
                     Application.DoEvents();
                     CheckText(window);
+                    CheckHangulBreaks(window);
                     Require(path.ReadOnly && path.Multiline && path.WordWrap && path.TabStop,
                         "Installation path must wrap and remain selectable/read-only");
                     Point last = path.GetPositionFromCharIndex(path.TextLength - 1);
@@ -108,6 +156,7 @@ internal static class TestLayout
                     window.PerformLayout();
                     Application.DoEvents();
                     CheckText(window);
+                    CheckHangulBreaks(window);
                     Panel viewport = (Panel)body.Parent;
                     viewport.ScrollControlIntoView(status);
                     Rectangle statusBounds = viewport.RectangleToClient(status.RectangleToScreen(status.ClientRectangle));

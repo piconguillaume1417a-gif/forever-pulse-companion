@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -160,12 +161,65 @@ internal sealed class InstallPathBox : TextBox
     protected override void OnResize(EventArgs e) { base.OnResize(e); FitText(); }
 }
 
+// A label whose Korean lines break at spaces only. Windows (DrawText WordBreak) may end
+// a line between two hangul syllables, in the middle of a word; the Companion's window
+// follows the same rule (internal/winui, peintre.couper). Other languages keep the
+// native Label drawing unchanged.
+internal sealed class SetupLabel : Label
+{
+    private const TextFormatFlags Flags = TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak;
+
+    // The text as drawn: in Korean, with a line break at a space wherever needed.
+    public string DrawnText { get { return Program.Korean ? Wrap(Text, Font, TextWidth(ClientSize.Width)) : Text; } }
+
+    private int TextWidth(int width) { return Math.Max(1, width - Padding.Horizontal); }
+
+    internal static string Wrap(string text, Font font, int width)
+    {
+        StringBuilder result = new StringBuilder();
+        string[] paragraphs = text.Split('\n');
+        for (int i = 0; i < paragraphs.Length; i++)
+        {
+            if (i > 0) result.Append('\n');
+            string line = "";
+            foreach (string word in paragraphs[i].Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string candidate = line.Length == 0 ? word : line + " " + word;
+                if (line.Length > 0 && TextRenderer.MeasureText(candidate, font, new Size(int.MaxValue, int.MaxValue),
+                        TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width > width)
+                {
+                    result.Append(line).Append('\n');
+                    line = word;
+                }
+                else line = candidate;
+            }
+            result.Append(line);
+        }
+        return result.ToString();
+    }
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        if (!Program.Korean || proposedSize.Width <= 1) return base.GetPreferredSize(proposedSize);
+        int width = TextWidth(proposedSize.Width);
+        Size text = TextRenderer.MeasureText(Wrap(Text, Font, width), Font, new Size(width, int.MaxValue), Flags);
+        return new Size(Math.Min(proposedSize.Width, text.Width + Padding.Horizontal), text.Height + Padding.Vertical);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        if (!Program.Korean) { base.OnPaint(e); return; }
+        Rectangle area = new Rectangle(Padding.Left, Padding.Top, TextWidth(ClientSize.Width), Math.Max(1, ClientSize.Height - Padding.Vertical));
+        TextRenderer.DrawText(e.Graphics, DrawnText, Font, area, Enabled ? ForeColor : SystemColors.GrayText, Flags);
+    }
+}
+
 internal sealed class SetupWindow : Form
 {
     private readonly Button install = new Button();
     private readonly Button close = new Button();
     private readonly CheckBox desktop = new CheckBox();
-    private readonly Label status = new Label();
+    private readonly Label status = new SetupLabel();
     private readonly ProgressBar progress = new ProgressBar();
     private bool installing, complete;
 
@@ -227,7 +281,7 @@ internal sealed class SetupWindow : Form
         subtitle.Dock = DockStyle.Fill;
         subtitle.Margin = Padding.Empty;
         subtitle.ForeColor = Color.FromArgb(193, 206, 228);
-        subtitle.Text = "Version " + PackageInfo.Version + " · Windows 11 · 64" + Program.T(" bits", "-bit", "비트");
+        subtitle.Text = Program.T("Version ", "Version ", "버전 ") + PackageInfo.Version + " · Windows 11 · 64" + Program.T(" bits", "-bit", "비트");
         header.Controls.Add(subtitle, 1, 1);
 
         // Rows follow their contents, including wrapped text at larger Windows scales.
@@ -307,7 +361,7 @@ internal sealed class SetupWindow : Form
 
     private void AddLabel(TableLayoutPanel parent, string text, bool bold)
     {
-        Label label = new Label();
+        Label label = new SetupLabel();
         label.AutoSize = true;
         label.Dock = DockStyle.Top;
         label.Margin = new Padding(0, 0, 0, bold ? 18 : 12);
