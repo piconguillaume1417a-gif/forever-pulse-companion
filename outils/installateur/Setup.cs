@@ -258,7 +258,7 @@ internal sealed class SetupWindow : Form
         path.BackColor = Color.White;
         body.Controls.Add(path);
         AddLabel(body, Program.T("Votre configuration, votre connexion et vos relevés sont conservés.\nUn raccourci sera ajouté au menu Démarrer. Aucun droit administrateur.\nLe Compagnon se met ensuite à jour tout seul.",
-            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date.", "설정, 연결, 기록은 유지됩니다.\n시작 메뉴에 바로 가기가 추가됩니다. 관리자 권한은 필요하지 않습니다.\n이후 Companion은 자동으로 업데이트됩니다."), false);
+            "Your settings, connection and readings are kept.\nA Start menu shortcut will be added. No administrator rights.\nThe Companion then keeps itself up to date.", "설정, 연결, 측정 데이터는 유지됩니다.\n시작 메뉴에 바로 가기가 추가됩니다. 관리자 권한은 필요하지 않습니다.\n이후 Companion은 자동으로 업데이트됩니다."), false);
         desktop.AutoSize = true;
         desktop.Dock = DockStyle.Top;
         desktop.Margin = new Padding(0, 0, 0, 18);
@@ -320,7 +320,7 @@ internal sealed class SetupWindow : Form
     {
         if (!complete && Program.CompanionRunning())
         {
-            if (MessageBox.Show(this, Program.T("Le Compagnon est ouvert. Le fermer maintenant pour l'installer ? Aucun relevé n'est perdu.", "The Companion is running. Close it now to install? No reading is lost.", "Companion이 실행 중입니다. 지금 종료하고 설치하시겠습니까? 기록은 사라지지 않습니다."),
+            if (MessageBox.Show(this, Program.T("Le Compagnon est ouvert. Le fermer maintenant pour l'installer ? Aucun relevé n'est perdu.", "The Companion is running. Close it now to install? No reading is lost.", "Companion이 실행 중입니다. 지금 종료하고 설치하시겠습니까? 측정 데이터는 사라지지 않습니다."),
                     "Forever Pulse Companion", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
                 return;
             status.Text = Program.T("Fermeture du Compagnon…", "Closing the Companion…", "Companion 종료 중…");
