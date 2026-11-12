@@ -95,8 +95,8 @@ type Fiche struct {
 	Vu         int64
 	Lu         int64
 	Releves    []Releve
-	Valeurs    int // valeurs transmises
-	Illisibles int // valeurs ou groupes écartés parce qu'illisibles
+	Valeurs    int      // valeurs transmises
+	Illisibles int      // valeurs ou groupes écartés parce qu'illisibles
 	Talents    *Talents // nil : spé inconnue (pas de ta lisible), clé absente du JSON
 	Payload    []byte
 	Empreinte  string
@@ -131,7 +131,12 @@ type Fichier struct {
 func Decode(db *lua.Table) *Fichier { return DecodeAt(db, time.Now()) }
 
 // DecodeAt : comme Decode, à l'heure now (borne « 5 min dans le futur » des talents).
-func DecodeAt(db *lua.Table, now time.Time) *Fichier {
+func DecodeAt(db *lua.Table, now time.Time) *Fichier { return decodeAt(db, now, false) }
+
+// DecodeHeader includes the shared context catalogue for streamed chunks.
+func DecodeHeader(db *lua.Table, now time.Time) *Fichier { return decodeAt(db, now, true) }
+
+func decodeAt(db *lua.Table, now time.Time, allContexts bool) *Fichier {
 	f := &Fichier{Arbres: []any{}}
 	if db == nil {
 		return f
@@ -211,7 +216,7 @@ func DecodeAt(db *lua.Table, now time.Time) *Fichier {
 	}
 
 	for _, nom := range noms {
-		if !utilises[nom] {
+		if !allContexts && !utilises[nom] {
 			continue
 		}
 		f.Contextes = append(f.Contextes, schema.KV{K: nom, V: contexte(nom, lua.AsTable(desc.Get(nom)))})

@@ -82,10 +82,24 @@ func entier(n int) lua.Number { return lua.Number{I: int64(n), IsInt: true} }
 
 // DevelopperLot : équivalent schéma 4 d'un lot (un lot 4 ressort identique).
 func DevelopperLot(db, lot *lua.Table) (*lua.Table, error) {
-	return developper(db, lot, map[string][]any{})
+	return developper(db, lot, map[string][]any{}, nil)
 }
 
-func developper(db, lot *lua.Table, cache map[string][]any) (*lua.Table, error) {
+// Developer reuses the expanded dictionaries across batches in one file.
+type Developer struct {
+	DB         *lua.Table
+	cache      map[string][]any
+	LookupName func(int) (string, bool)
+}
+
+func (d *Developer) Lot(lot *lua.Table) (*lua.Table, error) {
+	if d.cache == nil {
+		d.cache = make(map[string][]any)
+	}
+	return developper(d.DB, lot, d.cache, d.LookupName)
+}
+
+func developper(db, lot *lua.Table, cache map[string][]any, lookup func(int) (string, bool)) (*lua.Table, error) {
 	l := copieTable(lot)
 	dicts := lua.AsTable(db.Get("dicts"))
 	switch lua.Str(l.Get("method")) {
@@ -112,7 +126,7 @@ func developper(db, lot *lua.Table, cache map[string][]any) (*lua.Table, error) 
 		}
 	}
 	if m := lua.Str(l.Get("method")); m == "channel_roster" || m == "who_manual" {
-		if err := decoderColonnes(db, l, cache); err != nil {
+		if err := decoderColonnes(db, l, cache, lookup); err != nil {
 			return nil, err
 		}
 	}
@@ -141,7 +155,7 @@ func DevelopperLots(db *lua.Table) ([]*lua.Table, map[int]error) {
 			out = append(out, &lua.Table{Str: map[string]any{}, Int: map[int64]any{}})
 			continue
 		}
-		d, err := developper(db, t, cache)
+		d, err := developper(db, t, cache, nil)
 		if err != nil {
 			errs[i] = err
 			out = append(out, t)
@@ -154,12 +168,16 @@ func DevelopperLots(db *lua.Table) ([]*lua.Table, map[int]error) {
 
 // decoderColonnes remplace les indices des colonnes « …# » par leurs valeurs et retire les « # »
 // de l'en-tête (schémas 5 et 6).
-func decoderColonnes(db, l *lua.Table, cache map[string][]any) error {
+func decoderColonnes(db, l *lua.Table, cache map[string][]any, lookup func(int) (string, bool)) error {
 	noms := strings.Split(lua.Str(l.Get("fields")), "|")
 	codes := map[int][]any{}
 	for j, c := range noms {
 		d, ok := dictColonne[c]
 		if !ok {
+			continue
+		}
+		if d == "names" && lookup != nil {
+			codes[j] = nil
 			continue
 		}
 		t, vu := cache[d]
@@ -185,6 +203,14 @@ func decoderColonnes(db, l *lua.Table, cache map[string][]any) error {
 			i, err := strconv.Atoi(parts[j])
 			if err != nil || !isDigits(parts[j]) {
 				return schemaErr("ligne %d : indice %s non entier « %s »", numero+1, noms[j], parts[j])
+			}
+			if lookup != nil && dictColonne[noms[j]] == "names" {
+				v, ok := lookup(i)
+				if !ok {
+					return schemaErr("ligne %d : indice %s hors dictionnaire : %d", numero+1, noms[j], i)
+				}
+				parts[j] = v
+				continue
 			}
 			if i < 1 || i > len(t) {
 				return schemaErr("ligne %d : indice %s hors dictionnaire : %d (taille %d)", numero+1, noms[j], i, len(t))

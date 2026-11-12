@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
@@ -50,6 +51,7 @@ create table if not exists queue(
 );
 create index if not exists queue_pending on queue(state, file_sha256, observed_at);
 create table if not exists cumul_lots(batch_id text primary key, seq integer not null);
+create table if not exists cumul_scope_regions(scope_id text not null, region text not null, cumul_key text not null unique, primary key(scope_id,region));
 create table if not exists cumul_scopes(scope_id text primary key, depuis integer);
 create table if not exists cumul_persos(scope_id text not null, cle text not null, data text not null, primary key(scope_id, cle));
 create table if not exists cumul_noms(scope_id text not null, nom text not null, cle text not null, primary key(scope_id, nom));
@@ -137,7 +139,7 @@ func (s *Store) Wipe() error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, t := range []string{"guild_queue", "guild_files", "auctions_parts", "auctions_markets", "auctions_queue", "auctions_files", "queue", "files", "stats_queue", "stats_files", "cumul_lots", "cumul_scopes", "cumul_persos", "cumul_noms", "meta"} {
+	for _, t := range []string{"guild_queue", "guild_files", "auctions_parts", "auctions_markets", "auctions_queue", "auctions_files", "queue", "files", "stats_queue", "stats_files", "cumul_lots", "cumul_scope_regions", "cumul_scopes", "cumul_persos", "cumul_noms", "meta"} {
 		if _, err := tx.Exec("delete from " + t); err != nil {
 			return err
 		}
@@ -446,6 +448,7 @@ func (s *Store) StatsPending(limitBytes int) (meta []byte, sheets []StatSheet, e
 	}
 	defer rows.Close()
 	total := len(m)
+	contexts := map[string]bool{}
 	for rows.Next() {
 		var f StatSheet
 		var p string
@@ -453,9 +456,11 @@ func (s *Store) StatsPending(limitBytes int) (meta []byte, sheets []StatSheet, e
 		if err := rows.Scan(&f.ID, &f.Digest, &p, &n); err != nil {
 			return nil, nil, err
 		}
-		if len(sheets) > 0 && total+n+1 > limitBytes {
+		context, _, _ := strings.Cut(f.ID, "/Player-")
+		if len(sheets) > 0 && (total+n+1 > limitBytes || !contexts[context] && len(contexts) >= 16) {
 			break
 		}
+		contexts[context] = true
 		total += n + 1
 		f.Payload = []byte(p)
 		sheets = append(sheets, f)

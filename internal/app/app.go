@@ -11,13 +11,12 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,11 +32,10 @@ import (
 	"wowsync/internal/sender"
 	"wowsync/internal/stats"
 	"wowsync/internal/store"
-	"wowsync/internal/watch"
 )
 
 const (
-	Version = "0.10.0-rc.11"
+	Version = "0.10.0-rc.12"
 	Nom     = "forever-pulse-companion"
 )
 
@@ -238,149 +236,6 @@ func isDigits(s string) bool {
 }
 
 // ProcessFile traite un fichier s'il est nouveau. Renvoie le nombre de lots mis en file.
-func (a *App) ProcessFile(ctx context.Context, path string) (int, error) {
-	if AuctionPath(path) {
-		return a.ProcessAuctions(ctx, path)
-	}
-	data, sha, err := watch.Read(path)
-	if err != nil {
-		return 0, err
-	}
-	short := sha[:12]
-	lotsConnus, statsConnues := a.Store.FileKnown(sha), a.Store.StatsFileKnown(sha)
-	guildKnown := a.Store.GuildFileKnown(sha)
-	if lotsConnus && statsConnues && guildKnown {
-		a.Log.Printf("fichier %s (%s) déjà traité, ignoré", filepath.Base(path), short)
-		return 0, nil
-	}
-	// 0.6.0 : un gros fichier réclame quelques centaines de Mo le temps du
-	// décodage ; ils sont rendus à Windows dès la fin du traitement, sans attendre
-	// le ramasse-miettes (le compagnon reste léger en fond).
-	defer debug.FreeOSMemory()
-	f, db, sf, gf, err := decodeWithGuild(data, a.Now())
-	if err != nil {
-		a.Log.Printf("fichier %s (%s) illisible : %s", filepath.Base(path), short, strings.SplitN(err.Error(), "—", 2)[0])
-		return 0, err
-	}
-	_ = a.Store.Set("last_read", fmt.Sprintf("%s|%s|%s", a.Now().Format(time.RFC3339), short, path))
-	if len(f.Fatales) > 0 {
-		for _, e := range f.Fatales {
-			a.Log.Printf("fichier %s (%s) refusé : %s", filepath.Base(path), short, e)
-		}
-		return 0, fmt.Errorf("fichier refusé (%d défauts)", len(f.Fatales))
-	}
-	if !guildKnown {
-		g, ge := guilds.Decode(gf, lua.AsTable(db.Get("scopes")), a.Now())
-		if ge != nil {
-			a.Log.Printf("guild roster rejected: invalid or incomplete snapshot")
-			_ = a.Store.Set("guild_note", "invalid_snapshot")
-		}
-		if ge == nil {
-			_ = a.Store.Set("guild_note", "")
-		}
-		if err := a.Store.AddGuild(ctx, sha, g); err != nil {
-			return 0, err
-		}
-	}
-	if lotsConnus {
-		// Fichier déjà traité par une version antérieure à la 0.7.0 : seules ses
-		// statistiques restent à mettre en file.
-		if _, err := a.traiteStats(ctx, sha, path, f.AddonVersion, sf); err != nil {
-			return 0, err
-		}
-		a.changed()
-		return 0, nil
-	}
-	var batches []store.QueuedBatch
-	ecartes := 0
-	for _, l := range f.Lots {
-		if !l.Valide() {
-			ecartes++
-			// Journal : identifiant de lot et motif. Les motifs ne portent pas de nom
-			// de personnage (au plus un GUID ou un index de ligne).
-			a.Log.Printf("lot %s écarté (%s %s) : %s", l.BatchID, l.Method, l.Kind, strings.Join(l.Erreurs, " ; "))
-			continue
-		}
-		body, err := schema.Marshal(l.Payload)
-		if err != nil {
-			return 0, err
-		}
-		batches = append(batches, store.QueuedBatch{BatchID: l.BatchID, ScopeID: l.ScopeID, ObservedAt: l.ObservedAt,
-			Characters: l.Personnages, Payload: body})
-	}
-	scopes, _ := schema.Marshal(scopeObj(f))
-	a.mu.Lock()
-	// 0.7.4 : cumul relu pour ce fichier seulement, puis abandonné (rendu à Windows
-	// par le FreeOSMemory différé). Transaction annulée : rien n'est gardé à moitié,
-	// le prochain fichier relira la base.
-	c, err := a.Store.LoadCumul()
-	if err != nil {
-		a.mu.Unlock()
-		return 0, err
-	}
-	st := c.Integrer(CumulLots(db))
-	a.resumeValid = false
-	added, err := a.Store.AddFile(ctx, store.File{SHA256: sha, Path: path, Origin: Origin(path), AddonVersion: f.AddonVersion,
-		ObserverSessionID: f.ObserverID, Scopes: scopes, Total: len(f.Lots), Discarded: ecartes}, batches, c)
-	c = nil
-	if err != nil {
-		a.mu.Unlock()
-		return 0, err
-	}
-	a.mu.Unlock()
-	a.Log.Printf("fichier %s (%s, %s, addon %s) : %d lots, %d en file, %d écartés ; cumul +%d personnages, %d fusions /who",
-		filepath.Base(path), short, Origin(path), f.AddonVersion, len(f.Lots), added, ecartes, st.Nouveaux, st.Fusions)
-	if !statsConnues {
-		// Les statistiques ne bloquent jamais les lots : une erreur est journalisée et
-		// le fichier sera relu au prochain changement.
-		if _, err := a.traiteStats(ctx, sha, path, f.AddonVersion, sf); err != nil {
-			a.Log.Printf("statistiques du fichier %s (%s) non mises en file : %v", filepath.Base(path), short, err)
-		}
-	}
-	a.changed()
-	return added, nil
-}
-
-// traiteStats met en file les fiches de statistiques d'un fichier. Le journal ne
-// porte ni nom de personnage ni GUID : des comptes et des motifs seulement.
-func (a *App) traiteStats(ctx context.Context, sha, path, addonVersion string, sf *stats.Fichier) (int, error) {
-	short := sha[:12]
-	if sf == nil || !sf.Present {
-		_, err := a.Store.AddStatsFile(ctx, sha, []byte("{}"), nil, 0, 0)
-		return 0, err
-	}
-	for _, l := range sf.Infos {
-		a.Log.Printf("fichier %s (%s) : %s", filepath.Base(path), short, l)
-	}
-	for _, l := range sf.Ecartees {
-		a.Log.Printf("fichier %s (%s) : statistiques, %s", filepath.Base(path), short, l)
-	}
-	if len(sf.Fatales) > 0 {
-		for _, e := range sf.Fatales {
-			a.Log.Printf("fichier %s (%s) : statistiques non envoyées : %s", filepath.Base(path), short, e)
-		}
-		_ = a.Store.Set("stats_note", sf.Fatales[0])
-		_, err := a.Store.AddStatsFile(ctx, sha, []byte("{}"), nil, sf.Total, sf.Total)
-		return 0, err
-	}
-	meta, err := sf.Meta(sha, Origin(path), addonVersion)
-	if err != nil {
-		return 0, err
-	}
-	sheets := make([]store.StatSheet, 0, len(sf.Fiches))
-	for _, fi := range sf.Fiches {
-		sheets = append(sheets, store.StatSheet{ID: fi.ID, Digest: fi.Empreinte, Fresh: fi.Fraicheur(), Payload: fi.Payload})
-	}
-	added, err := a.Store.AddStatsFile(ctx, sha, meta, sheets, sf.Total, sf.Total-len(sf.Fiches))
-	if err != nil {
-		return 0, err
-	}
-	_ = a.Store.Set("stats_note", "")
-	a.Log.Printf("fichier %s (%s) : statistiques, %d fiches lues, %d nouvelles ou modifiées mises en file, %d inchangées",
-		filepath.Base(path), short, len(sf.Fiches), added, len(sf.Fiches)-added)
-	return added, nil
-}
-
 // StatsBody construit le corps d'un envoi de statistiques (contrat
 // forever-pulse-stats). meta est l'objet { file, contexts, catalog, talent_trees }
 // enregistré avec le fichier. Schéma 2 (0.9.0) : talent_trees, file.talents_version
@@ -398,7 +253,37 @@ func StatsBody(meta []byte, sheets []store.StatSheet, schemaEnvoi int) ([]byte, 
 	if err != nil {
 		return nil, errors.New("statistiques : en-tête de fichier illisible")
 	}
-	m = string(mb)
+	// The streamed file header contains all known contexts. The wire
+	// request only needs the contexts of its own sheets.
+	members, err := schema.Membres(mb)
+	if err != nil {
+		return nil, err
+	}
+	used := make(map[string]bool)
+	for _, sheet := range sheets {
+		if pos := strings.LastIndexByte(sheet.ID, '/'); pos >= 0 {
+			used[sheet.ID[:pos]] = true
+		}
+	}
+	if len(used) > 0 {
+		for j := range members {
+			if members[j].K != "contexts" {
+				continue
+			}
+			contexts, err := schema.Membres(members[j].V)
+			if err != nil {
+				return nil, err
+			}
+			kept := contexts[:0]
+			for _, entry := range contexts {
+				if used[entry.K] {
+					kept = append(kept, entry)
+				}
+			}
+			members[j].V = schema.Assemble(kept)
+		}
+	}
+	m = string(schema.Assemble(members))
 	comp, _ := schema.Marshal(schema.Obj{{K: "name", V: Nom}, {K: "version", V: Version}})
 	var b strings.Builder
 	b.WriteString(`{"schema":`)
@@ -749,6 +634,21 @@ func (a *App) posteCensus(ctx context.Context, token string, f *store.File, batc
 			return err
 		}
 		return a.posteCensus(ctx, token, f, batches[middle:], requestsLeft)
+	}
+	// Guild parts have separate receipts and admission. A failed part must
+	// not delay acknowledgement of a different part or a /who observation.
+	if len(batches) > 1 {
+		for i, b := range batches {
+			if bytes.Contains(b.Payload, []byte(`"method":"guild_membership"`)) {
+				if err := a.posteCensus(ctx, token, f, batches[:i], requestsLeft); err != nil {
+					return err
+				}
+				if err := a.posteCensus(ctx, token, f, batches[i:i+1], requestsLeft); err != nil {
+					return err
+				}
+				return a.posteCensus(ctx, token, f, batches[i+1:], requestsLeft)
+			}
+		}
 	}
 	body, err := Body(f, batches)
 	if err != nil {
