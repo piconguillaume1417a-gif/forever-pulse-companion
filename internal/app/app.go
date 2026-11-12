@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	Version = "0.10.0-rc.14"
+	Version = "0.10.0-rc.16"
 	Nom     = "forever-pulse-companion"
 )
 
@@ -855,14 +855,15 @@ func (a *App) Etat() Etat {
 			if a.Store.Get("guild_blocked") != "" {
 				e.Message = i18n.T("st.guildblocked")
 			}
-		} else if e.GuildRejected > 0 || a.Store.Get("guild_note") != "" {
+		} else if a.Store.Get("guild_note") != "" {
 			e.Couleur, e.Code, e.Message = Orange, "rejected", i18n.T("st.guildrejected")
 		} else if e.AuctionPending > 0 {
 			e.Couleur, e.Code, e.Message = Orange, "pending", i18n.T("st.auctionpending", e.AuctionPending)
-		} else if e.Rejected > 0 || e.StatsRejected > 0 {
-			// A refused parent is not an upload success. This is a display-only
-			// warning; healthy census batches and independent sheets keep flowing.
-			e.Couleur, e.Code, e.Message = Orange, "rejected", i18n.T("st.rejected", e.Rejected, e.StatsRejected)
+		} else if e.Rejected > 0 || e.StatsRejected > 0 || e.GuildRejected > 0 {
+			// Owner decision, 12 Nov 2026: past refusals are never re-sent and must not
+			// keep the Companion orange forever. Nothing is pending or blocked, so it is
+			// working; the refused counts stay visible in the tiles and the details.
+			e.Couleur, e.Code, e.Message = Vert, "working", i18n.T("st.working")
 		} else {
 			e.Couleur, e.Code, e.Message = Vert, "allsent", i18n.T("st.allsent")
 		}

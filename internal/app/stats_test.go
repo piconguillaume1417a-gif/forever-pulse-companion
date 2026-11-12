@@ -495,8 +495,10 @@ func TestStatsUneFicheRefuseeNeBloquePasLesAutres(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.etat(0, 8, 1)
-	// Rejected statistics remain visible, without blocking healthy census data.
-	if e := b.a.Etat(); e.Couleur != Orange || e.Code != "rejected" || e.Sent != 1 || b.st.Get("blocked") != "" {
+	// Rejected statistics stay counted, but the Companion is green: nothing is pending
+	// or blocked, and a past refusal is never re-sent (owner decision, 12 Nov 2026).
+	if e := b.a.Etat(); e.Couleur != Vert || e.Code != "working" || e.Sent != 1 || e.StatsRejected != 1 ||
+		b.st.Get("blocked") != "" {
 		t.Fatalf("état : %+v", e)
 	}
 }
