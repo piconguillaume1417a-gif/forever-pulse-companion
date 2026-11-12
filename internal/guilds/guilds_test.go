@@ -44,3 +44,41 @@ func TestRejectIncomplete(t *testing.T) {
 		}
 	}
 }
+
+func TestRacesOptional(t *testing.T) {
+	plain, e := parse(t, fixture())
+	if e != nil {
+		t.Fatal(e)
+	}
+	m := fixture()
+	m["races"] = tl.L{"Player-9998-0001|2\nPlayer-9998-0003|95"}
+	s, e := parse(t, m)
+	if e != nil || s.ID != plain.ID {
+		t.Fatal("races must not change the snapshot id", e)
+	}
+	got := map[string]int{}
+	for _, x := range s.Members {
+		got[x.GUID] = x.RaceID
+	}
+	if got["Player-9998-0001"] != 2 || got["Player-9998-0002"] != 0 || got["Player-9998-0003"] != 95 {
+		t.Fatal("races not attached", got)
+	}
+	for _, bad := range []tl.L{{"Player-9998-0001|x"}, {"Player-9998-0009|2"}, {"Player-9998-0001|0"}, {"Player-9998-0001|2|3"}, {"Player-9998-0001|2\nPlayer-9998-0001|3"}} {
+		m := fixture()
+		m["races"] = bad
+		s, e := parse(t, m)
+		if e != nil {
+			t.Fatal("a bad race block must not refuse the snapshot", e)
+		}
+		for _, x := range s.Members {
+			if x.RaceID != 0 {
+				t.Fatal("bad race block kept", bad)
+			}
+		}
+	}
+	m = fixture()
+	m["races"] = "not a table"
+	if _, e := parse(t, m); e != nil {
+		t.Fatal(e)
+	}
+}
