@@ -31,6 +31,10 @@ requeued by this update. Individual scans are not fragmented.
 
 Build: `go build -trimpath -ldflags "-H windowsgui -s -w" -o ForeverPulseCompanion.exe ./cmd/forever-pulse-companion` (Go 1.24).
 
+Linux fork: WebKitGTK window, GTK dialogs, XDG autostart and Secret Service
+token storage. See [docs/LINUX.md](docs/LINUX.md) for dependencies and
+limitations.
+
 ## Lighter local database (0.10.0)
 
 The content of a census batch **sent more than 3 days ago** is erased from `companion.db`, two minutes after start-up

@@ -8,3 +8,7 @@ testdata/reel/
 
 /.test-tmp/
 /*.log
+
+# Build Linux (fork)
+/dist/
+/forever-pulse-companion
