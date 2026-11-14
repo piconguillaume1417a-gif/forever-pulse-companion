@@ -366,6 +366,37 @@ func (w *Window) Notify(title, text string, warn bool) {
 // Open ouvre un fichier ou une adresse avec l'application par défaut.
 func Open(target string) { go func() { _ = exec.Command("xdg-open", target).Run() }() }
 
+// OpenLog ouvre le journal dans l'éditeur de l'utilisateur. xdg-open lance un
+// gestionnaire « Terminal=true » (nvim, vim…) sans terminal depuis l'icône :
+// rien ne s'affiche. Quand $VISUAL ou $EDITOR est défini, on passe donc par
+// xdg-terminal-exec, qui ouvre le terminal de bureau.
+func OpenLog(target string) {
+	go func() {
+		if terminal, args, ok := editeurTerminal(target); ok {
+			if err := exec.Command(terminal, args...).Start(); err == nil {
+				return
+			}
+		}
+		_ = exec.Command("xdg-open", target).Run()
+	}()
+}
+
+// editeurTerminal construit la commande de l'éditeur dans le terminal de bureau.
+func editeurTerminal(target string) (string, []string, bool) {
+	editeur := strings.TrimSpace(os.Getenv("VISUAL"))
+	if editeur == "" {
+		editeur = strings.TrimSpace(os.Getenv("EDITOR"))
+	}
+	if editeur == "" {
+		return "", nil, false
+	}
+	terminal, err := exec.LookPath("xdg-terminal-exec")
+	if err != nil {
+		return "", nil, false
+	}
+	return terminal, append(strings.Fields(editeur), target), true
+}
+
 func autostartPath() (string, error) {
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {

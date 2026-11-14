@@ -21,6 +21,26 @@ func TestLogoDataURI(t *testing.T) {
 	}
 }
 
+func TestEditeurTerminal(t *testing.T) {
+	dir := t.TempDir()
+	terminal := filepath.Join(dir, "xdg-terminal-exec")
+	if err := os.WriteFile(terminal, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("VISUAL", "nvim -R")
+	t.Setenv("EDITOR", "nano")
+	got, args, ok := editeurTerminal("/tmp/companion.log")
+	if !ok || got != terminal || strings.Join(args, " ") != "nvim -R /tmp/companion.log" {
+		t.Fatalf("éditeur = %q %q %t", got, args, ok)
+	}
+	t.Setenv("VISUAL", "")
+	t.Setenv("EDITOR", "")
+	if _, _, ok := editeurTerminal("/tmp/companion.log"); ok {
+		t.Fatal("aucun éditeur ne doit produire de commande")
+	}
+}
+
 func TestDossiersBattleNetWine(t *testing.T) {
 	prefix := t.TempDir()
 	t.Setenv("WINEPREFIX", prefix)

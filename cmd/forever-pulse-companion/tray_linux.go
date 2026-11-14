@@ -331,7 +331,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 			webui.Item{Key: "connect", Label: i18n.T("btn.connect"), Action: func() { connecter(false) }},
 			webui.Item{Key: "cancel", Label: i18n.T("connect.cancel"), Action: annulerConnexion},
 			webui.Item{Key: "installations", Label: i18n.T("btn.installations"), Action: func() { webui.Open(companionURL) }},
-			webui.Item{Key: "log", Label: i18n.T("btn.log"), Action: func() { webui.Open(log.Path()) }},
+			webui.Item{Key: "log", Label: i18n.T("btn.log"), Action: func() { webui.OpenLog(log.Path()) }},
 			webui.Item{Key: "dir", Label: i18n.T("menu.dir"), Action: func() { w.PostShow(); choisirDossier() }},
 			webui.Item{Key: "autostart", Label: i18n.T("win.autostart"), Toggle: true, Checked: webui.StartsWithWindows(), Action: func() {
 				on := !webui.StartsWithWindows()
@@ -359,7 +359,7 @@ func runTray(dataDir string, hidden bool, apresMaj int) error {
 		case vue.Installations:
 			webui.Open(companionURL)
 		case vue.Journal:
-			webui.Open(log.Path())
+			webui.OpenLog(log.Path())
 		case vue.Page:
 			go connecter(false)
 		case vue.Dossier:
