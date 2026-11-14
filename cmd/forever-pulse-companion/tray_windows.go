@@ -526,14 +526,14 @@ func installeMaj(exe, majDir string, m update.Manifeste, pret string, log *logx.
 	return true, nil
 }
 
-func quitRunning() error {
+func quitRunning(string) error {
 	if !winui.QuitRunning() {
 		return fmt.Errorf("le compagnon ne tourne pas")
 	}
 	return nil
 }
 
-func menuRunning() error {
+func menuRunning(string) error {
 	if !winui.MenuRunning() {
 		return fmt.Errorf("le compagnon ne tourne pas")
 	}

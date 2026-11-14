@@ -10,7 +10,7 @@ import (
 func TestAllerRetour(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "config.toml")
 	c, err := Load(p) // absent : créé avec les défauts
-	if err != nil || c.WowDir != `C:\Program Files (x86)\World of Warcraft` {
+	if err != nil || c.WowDir != Defaults().WowDir {
 		t.Fatal(c, err)
 	}
 	c.SiteURL, c.StartWithWindows, c.WowDir, c.Language = "https://exemple.test", true, `D:\Jeux\World of Warcraft`, "en"

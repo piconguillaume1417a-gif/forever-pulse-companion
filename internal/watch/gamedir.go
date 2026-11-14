@@ -35,6 +35,16 @@ func Racine(p string) string {
 	if p == "" {
 		return ""
 	}
+	// Un dossier collé depuis Windows peut finir par « \ » ; hors Windows,
+	// filepath.Clean ne retire pas cette barre oblique inverse.
+	hadSep := len(p) > 0 && (p[len(p)-1] == '/' || p[len(p)-1] == '\\')
+	p = strings.TrimRight(p, `/\`)
+	if p == "" {
+		return string(filepath.Separator)
+	}
+	if hadSep && filepath.VolumeName(p) == p {
+		p += string(filepath.Separator) // « C: » seul reste la racine du lecteur
+	}
 	p = filepath.Clean(p)
 	for a := p; ; {
 		if clientDir(a) {
