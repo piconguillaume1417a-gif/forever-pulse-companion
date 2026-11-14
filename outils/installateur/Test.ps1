@@ -142,7 +142,7 @@ Assert ((Get-Item -LiteralPath (Join-Path $work 'preview.png')).Length -gt 5000)
 $layoutTest = Join-Path $work 'TestLayout.exe'
 & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /platform:x64 /warnaserror+ /utf8output "/out:$layoutTest" "/win32manifest:$PSScriptRoot\setup.manifest" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll "$PSScriptRoot\TestLayout.cs"
 Assert ($LASTEXITCODE -eq 0) 'Layout test compilation failed'
-foreach ($culture in @('fr-FR','en-US')) {
+foreach ($culture in @('fr-FR','en-US','ko-KR')) {
     RunExe $layoutTest ('"'+$setup+'" '+$culture+' "'+$work+'"')
     Write-Output (Get-Content -LiteralPath (Join-Path $work ($culture+'.txt')) -Raw)
 }

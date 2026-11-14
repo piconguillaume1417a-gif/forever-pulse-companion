@@ -171,7 +171,7 @@ type Window struct {
 
 	OnCommand func(id int)       // appelé dans un fil à part
 	OnToggle  func(checked bool) // interrupteur « Lancer au démarrage »
-	OnLangue  func(l i18n.Lang)  // FR / EN
+	OnLangue  func(l i18n.Lang)  // sélecteur de langue (FR / EN / 한국어)
 }
 
 var currentWindow *Window
@@ -447,12 +447,9 @@ func (w *Window) activer(id int) {
 		if w.OnToggle != nil {
 			go w.OnToggle(on)
 		}
-	case vue.LangueFR, vue.LangueEN:
-		l := i18n.FR
-		if id == vue.LangueEN {
-			l = i18n.EN
-		}
-		if l != i18n.Get() && w.OnLangue != nil {
+	case vue.LangueFR, vue.LangueEN, vue.LangueKO:
+		// Une zone de langue inconnue de la table n'a aucun effet.
+		if l, ok := vue.LangueDe(id); ok && l != i18n.Get() && w.OnLangue != nil {
 			go w.OnLangue(l)
 		}
 	default:
