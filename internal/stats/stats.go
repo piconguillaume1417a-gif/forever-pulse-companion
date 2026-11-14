@@ -98,6 +98,7 @@ type Fiche struct {
 	Valeurs    int      // valeurs transmises
 	Illisibles int      // valeurs ou groupes écartés parce qu'illisibles
 	Talents    *Talents // nil : spé inconnue (pas de ta lisible), clé absente du JSON
+	Pvp        *Pvp     // nil : rang JcJ inconnu (pas de pv lisible), clé absente du JSON
 	Payload    []byte
 	Empreinte  string
 }
@@ -124,6 +125,11 @@ type Fichier struct {
 	TalentsHorsBornes int   // ta hors des bornes du site, ignorés (fiche gardée)
 	ArbresIgnores     int   // arbres du catalogue écartés
 	NoeudsIgnores     int   // nœuds (ou identifiants hors grille) écartés, arbre gardé
+
+	// Rang JcJ (champ pv, sans version de sous-format) : compté comme ta.
+	AvecPvp       int // fiches envoyables portant un rang JcJ
+	PvpIllisibles int // pv illisibles, ignorés (fiche gardée)
+	PvpHorsBornes int // pv hors des bornes du site, ignorés (fiche gardée)
 }
 
 // Decode analyse la table ForeverPulseStatsDB. Une table absente n'est pas une
@@ -208,6 +214,18 @@ func decodeAt(db *lua.Table, now time.Time, allContexts bool) *Fichier {
 				f.AvecTalents++
 			}
 		}
+		if x := p.Get("pv"); x != nil {
+			pv, illisible, horsBornes := decodePvp(x, now)
+			switch {
+			case illisible:
+				f.PvpIllisibles++
+			case horsBornes:
+				f.PvpHorsBornes++
+			default:
+				fiche.Pvp = pv
+				f.AvecPvp++
+			}
+		}
 		utilises[fiche.Contexte] = true
 		f.Fiches = append(f.Fiches, fiche)
 	}
@@ -226,6 +244,12 @@ func decodeAt(db *lua.Table, now time.Time, allContexts bool) *Fichier {
 		f.Arbres = arbres(lua.AsTable(db.Get("arbres")), f)
 		f.Infos = append(f.Infos, fmt.Sprintf("talents : %d fiches avec talents, %d illisibles et %d hors bornes ignorés ; %d arbres au catalogue, %d écartés, %d nœuds écartés",
 			f.AvecTalents, f.TalentsIllisibles, f.TalentsHorsBornes, len(f.Arbres), f.ArbresIgnores, f.NoeudsIgnores))
+	}
+	// Ligne écrite seulement si l'addon écrit des pv : les journaux des fichiers
+	// sans rang JcJ restent inchangés.
+	if f.AvecPvp+f.PvpIllisibles+f.PvpHorsBornes > 0 {
+		f.Infos = append(f.Infos, fmt.Sprintf("rang JcJ : %d fiches avec rang, %d illisibles et %d hors bornes ignorés",
+			f.AvecPvp, f.PvpIllisibles, f.PvpHorsBornes))
 	}
 
 	for _, fiche := range f.Fiches {
@@ -479,6 +503,11 @@ func (fi *Fiche) objet() schema.Obj {
 	if fi.Talents != nil {
 		o = append(o, schema.KV{K: "talents", V: fi.Talents.objet()})
 	}
+	// De même pour pvp, toujours après readings et talents : une fiche sans pv
+	// lisible garde exactement la charge et l'empreinte d'avant ce champ.
+	if fi.Pvp != nil {
+		o = append(o, schema.KV{K: "pvp", V: fi.Pvp.objet()})
+	}
 	return o
 }
 
@@ -582,7 +611,8 @@ func catalogue(c *lua.Table, f *Fichier) any {
 	return o
 }
 
-// Fraicheur : la date la plus récente portée par la fiche (vue, lue, relevés).
+// Fraicheur : la date la plus récente portée par la fiche (vue, lue, relevés,
+// talents, rang JcJ) : un rang lu plus tard fait repartir la fiche.
 func (fi *Fiche) Fraicheur() int64 {
 	t := fi.Vu
 	if fi.Lu > t {
@@ -595,6 +625,9 @@ func (fi *Fiche) Fraicheur() int64 {
 	}
 	if fi.Talents != nil && fi.Talents.T > t {
 		t = fi.Talents.T
+	}
+	if fi.Pvp != nil && fi.Pvp.T > t {
+		t = fi.Pvp.T
 	}
 	return t
 }
@@ -667,7 +700,8 @@ func CorpsSchema(meta []byte, schemaEnvoi int) ([]byte, error) {
 }
 
 // FicheSchema rend la charge d'une fiche pour le schéma demandé : schéma 1, sans
-// talents ; schéma 2, telle quelle.
+// talents ; schéma 2, telle quelle. pvp part dans les deux schémas (le site
+// l'accepte en 1 comme en 2) : il n'est jamais retiré.
 func FicheSchema(payload []byte, schemaEnvoi int) ([]byte, error) {
 	if schemaEnvoi != SchemaEnvoiRepli {
 		return payload, nil

@@ -232,6 +232,7 @@ Le site garde ces observations 30 jours au plus et en publie des agrégats (popu
 - par relevé : date, niveau, source (cible, survol, groupe…) et valeurs des statistiques, rangées par unité (`count`, `copper`, `percent`) ;
 - le catalogue des noms de statistiques quand l'addon l'a exporté (addon 3.9.8 et suivants) ;
 - au schéma 2 (addon 4.2.0, branche `feat/talent-specs`) : par personnage, le dernier relevé de talents (date, niveau, source parmi plaque, cible, focus, survol, arbre, points par nœud avec l'entrée choisie, points par branche, branche dominante, nœuds hors grille) ; par fichier, la version du format des talents et le catalogue des arbres (nœuds, position, rangs, branche, sort, nom). Le nom de configuration de talents de l'inspecté n'est jamais lu ni envoyé. En repli sur le schéma 1, rien de cela ne part.
+- dans les deux schémas, quand l'addon l'a lu (champ `pv`) : par personnage, le dernier rang JcJ (date de lecture, rang de 0 à 14, total à vie des victoires honorables), clé `pvp` ; une fiche sans rang lisible part exactement comme avant.
 
 Le site garde la dernière valeur connue de chaque statistique par personnage, 30 jours au plus, et en publie des agrégats (moyenne, médiane, minimum, maximum, nombre de personnages qui ont réellement la mesure).
 
