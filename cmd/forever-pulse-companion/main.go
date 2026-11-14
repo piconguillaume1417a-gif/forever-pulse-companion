@@ -68,9 +68,9 @@ func main() {
 	case *connectFlag:
 		err = runConnect(*dataDir)
 	case *quit:
-		err = quitRunning()
+		err = quitRunning(*dataDir)
 	case *menu:
-		err = menuRunning()
+		err = menuRunning(*dataDir)
 	case *status:
 		err = runStatus(*dataDir)
 	case *once != "":

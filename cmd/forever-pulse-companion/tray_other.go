@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !(linux && cgo)
 
 package main
 
@@ -31,6 +31,6 @@ func runTray(dataDir string, _ bool, _ int) error {
 	return nil
 }
 
-func quitRunning() error { return errors.New("--quit : Windows seulement") }
+func quitRunning(string) error { return errors.New("--quit : Windows seulement") }
 
-func menuRunning() error { return errors.New("--menu : Windows seulement") }
+func menuRunning(string) error { return errors.New("--menu : Windows seulement") }
