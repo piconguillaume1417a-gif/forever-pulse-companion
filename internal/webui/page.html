@@ -1,0 +1,391 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever Pulse Companion</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fond: #f3f4f9;
+    --texte: #1a1d2b;
+    --carte: #ffffff;
+    --bord: #e1e4ee;
+  }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: var(--fond); }
+  body { width: 440px; }
+  #ecran { display: block; width: 440px; height: 100px; outline: none; }
+  #bulle {
+    position: fixed; z-index: 10; display: none; max-width: 320px;
+    padding: 6px 9px; border-radius: 6px; font: 12px/1.35 system-ui, "Segoe UI", "Noto Sans", sans-serif;
+    white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none;
+    background: rgba(28, 30, 40, .96); color: #fff; border: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  }
+  #bulle.sombre { background: rgba(238, 239, 246, .98); color: #1a1d2b; border-color: rgba(0,0,0,.15); }
+</style>
+</head>
+<body>
+<canvas id="ecran" tabindex="0" aria-label="Forever Pulse Companion"></canvas>
+<div id="bulle" role="tooltip"></div>
+<script>
+"use strict";
+
+const canvas = document.getElementById("ecran");
+const ctx = canvas.getContext("2d");
+const bulle = document.getElementById("bulle");
+
+const etat = {
+  ops: [], zones: [], w: 440, h: 100, dark: false, logo: null,
+  hover: -1, press: -1, focus: -1, focusVisible: false,
+  sourisX: 0, sourisY: 0, logoPret: false
+};
+
+function poster(o) {
+  if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.fpc)
+    window.webkit.messageHandlers.fpc.postMessage(JSON.stringify(o));
+}
+
+function hex(n) {
+  return "#" + (n >>> 0).toString(16).padStart(6, "0").slice(-6);
+}
+
+function police(o) {
+  return (o.Gras ? "600 " : "400 ") + o.Taille +
+    'px system-ui, "Segoe UI", "Noto Sans", "DejaVu Sans", sans-serif';
+}
+
+function arrondi(x, y, w, h, r) {
+  r = Math.max(0, Math.min(r || 0, Math.min(w, h) / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function couper(texte, largeur) {
+  if (ctx.measureText(texte).width <= largeur) return texte;
+  let lo = 0, hi = texte.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (ctx.measureText(texte.slice(0, mid) + "…").width <= largeur) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo > 0 ? texte.slice(0, lo) + "…" : "";
+}
+
+function lignes(texte, largeur, maxLignes) {
+  const sorties = [];
+  for (const paragraphe of String(texte).split("\n")) {
+    if (paragraphe === "") { sorties.push(""); continue; }
+    let ligne = "";
+    for (const mot of paragraphe.split(/\s+/)) {
+      const essai = ligne === "" ? mot : ligne + " " + mot;
+      if (ctx.measureText(essai).width <= largeur || ligne === "") {
+        ligne = essai;
+      } else {
+        sorties.push(ligne);
+        ligne = mot;
+      }
+    }
+    sorties.push(ligne);
+  }
+  if (maxLignes && sorties.length > maxLignes) {
+    sorties.length = maxLignes;
+    sorties[maxLignes - 1] = couper(sorties[maxLignes - 1], largeur);
+  }
+  return sorties;
+}
+
+function texte(o) {
+  ctx.font = police(o);
+  ctx.fillStyle = hex(o.Couleur);
+  ctx.textAlign = o.Aligne === 1 ? "center" : o.Aligne === 2 ? "right" : "left";
+  const x = o.Aligne === 1 ? o.R.X + o.R.W / 2 : o.Aligne === 2 ? o.R.X + o.R.W : o.R.X;
+  if (!o.Lignes) {
+    ctx.textBaseline = "middle";
+    ctx.fillText(couper(o.Texte, o.R.W), x, o.R.Y + o.R.H / 2);
+    if (o.Souligne) {
+      const l = Math.min(o.R.W, ctx.measureText(o.Texte).width);
+      const y = o.R.Y + o.R.H / 2 + o.Taille * 0.62;
+      const x0 = o.Aligne === 1 ? x - l / 2 : o.Aligne === 2 ? x - l : x;
+      ctx.strokeStyle = hex(o.Couleur);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + l, y); ctx.stroke();
+    }
+    return;
+  }
+  ctx.textBaseline = "top";
+  const hauteur = Math.round(o.Taille * 1.35);
+  const max = Math.max(1, Math.floor(o.R.H / hauteur));
+  const ls = lignes(o.Texte, o.R.W, max);
+  const debut = o.R.Y + Math.max(0, (o.R.H - ls.length * hauteur) / 2);
+  ls.forEach((l, i) => {
+    if (o.Souligne) {
+      const t = ctx.measureText(l).width;
+      const x0 = o.Aligne === 1 ? x - t / 2 : o.Aligne === 2 ? x - t : x;
+      ctx.strokeStyle = hex(o.Couleur);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, debut + i * hauteur + o.Taille * 1.1);
+      ctx.lineTo(x0 + t, debut + i * hauteur + o.Taille * 1.1); ctx.stroke();
+    }
+    ctx.fillText(l, x, debut + i * hauteur);
+  });
+}
+
+function icone(g, r) {
+  const x = r.X, y = r.Y, w = r.W, h = r.H;
+  const cx = x + w / 2, cy = y + h / 2, s = Math.min(w, h);
+  ctx.save();
+  ctx.strokeStyle = hex(g.Couleur);
+  ctx.fillStyle = hex(g.Couleur);
+  ctx.lineWidth = Math.max(1.2, s / 12);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  switch (g.Texte) {
+    case "\ue724": // envoyer : pointe
+      ctx.moveTo(cx - s * .36, cy - s * .30);
+      ctx.lineTo(cx + s * .40, cy);
+      ctx.lineTo(cx - s * .36, cy + s * .30);
+      ctx.lineTo(cx - s * .20, cy);
+      ctx.closePath(); ctx.fill(); break;
+    case "\ue8a7": // lien : deux maillons
+      ctx.arc(cx - s * .18, cy, s * .20, Math.PI * .25, Math.PI * 1.75);
+      ctx.moveTo(cx + s * .33, cy);
+      ctx.arc(cx + s * .18, cy, s * .20, Math.PI * 1.25, Math.PI * .75);
+      ctx.stroke(); break;
+    case "\ue8a5": // journal : page et lignes
+      ctx.rect(cx - s * .28, cy - s * .34, s * .56, s * .68);
+      ctx.moveTo(cx - s * .14, cy - s * .14); ctx.lineTo(cx + s * .14, cy - s * .14);
+      ctx.moveTo(cx - s * .14, cy + s * .04); ctx.lineTo(cx + s * .14, cy + s * .04);
+      ctx.moveTo(cx - s * .14, cy + s * .22); ctx.lineTo(cx + s * .06, cy + s * .22);
+      ctx.stroke(); break;
+    case "\ue823": // horloge
+      ctx.arc(cx, cy, s * .34, 0, Math.PI * 2); ctx.stroke();
+      ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - s * .18);
+      ctx.moveTo(cx, cy); ctx.lineTo(cx + s * .15, cy + s * .07);
+      ctx.stroke(); break;
+    case "\ue774": // globe
+      ctx.arc(cx, cy, s * .34, 0, Math.PI * 2);
+      ctx.moveTo(cx, cy - s * .34); ctx.lineTo(cx, cy + s * .34);
+      ctx.moveTo(cx - s * .34, cy); ctx.lineTo(cx + s * .34, cy);
+      ctx.moveTo(cx - s * .26, cy - s * .18);
+      ctx.quadraticCurveTo(cx, cy - s * .05, cx + s * .26, cy - s * .18);
+      ctx.moveTo(cx - s * .26, cy + s * .18);
+      ctx.quadraticCurveTo(cx, cy + s * .05, cx + s * .26, cy + s * .18);
+      ctx.stroke(); break;
+    case "\ue73e": // ok
+      ctx.moveTo(cx - s * .34, cy);
+      ctx.lineTo(cx - s * .08, cy + s * .24);
+      ctx.lineTo(cx + s * .36, cy - s * .26);
+      ctx.stroke(); break;
+    case "\ue895": // attente : trois points
+      ctx.beginPath(); ctx.arc(cx - s * .24, cy, s * .065, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, s * .065, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + s * .24, cy, s * .065, 0, Math.PI * 2); ctx.fill(); break;
+    case "\ue7ba": // alerte
+      ctx.moveTo(cx, cy - s * .36);
+      ctx.lineTo(cx + s * .38, cy + s * .30);
+      ctx.lineTo(cx - s * .38, cy + s * .30);
+      ctx.closePath();
+      ctx.moveTo(cx, cy - s * .10); ctx.lineTo(cx, cy + s * .12); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy + s * .24, Math.max(1, s * .045), 0, Math.PI * 2); ctx.fill(); break;
+    case "\ue8b7": // dossier ouvert
+      ctx.moveTo(cx - s * .36, cy - s * .26);
+      ctx.lineTo(cx - s * .08, cy - s * .26);
+      ctx.lineTo(cx + s * .02, cy - s * .12);
+      ctx.lineTo(cx + s * .34, cy - s * .12);
+      ctx.lineTo(cx + s * .34, cy + s * .28);
+      ctx.lineTo(cx - s * .36, cy + s * .28);
+      ctx.closePath();
+      ctx.moveTo(cx - s * .36, cy - s * .26); ctx.lineTo(cx - s * .30, cy + s * .10);
+      ctx.stroke(); break;
+  }
+  ctx.restore();
+}
+
+function dessiner() {
+  const dpr = window.devicePixelRatio || 1;
+  const largeur = etat.w, hauteur = etat.h;
+  if (canvas.width !== Math.round(largeur * dpr) || canvas.height !== Math.round(hauteur * dpr)) {
+    canvas.width = Math.round(largeur * dpr);
+    canvas.height = Math.round(hauteur * dpr);
+    canvas.style.height = hauteur + "px";
+    document.body.style.height = hauteur + "px";
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, largeur, hauteur);
+
+  for (const o of etat.ops) {
+    const r = o.R;
+    switch (o.Genre) {
+      case 0: // rectangle
+        if (!o.Vide) {
+          arrondi(r.X, r.Y, r.W, r.H, o.Rayon);
+          ctx.fillStyle = hex(o.Couleur);
+          ctx.fill();
+        }
+        if (o.Epais > 0) {
+          const e = Math.max(1, o.Epais);
+          arrondi(r.X + e / 2, r.Y + e / 2, r.W - e, r.H - e, Math.max(0, o.Rayon - e / 2));
+          ctx.strokeStyle = hex(o.Bord);
+          ctx.lineWidth = e;
+          ctx.stroke();
+        }
+        break;
+      case 1: { // dégradé vertical
+        const g = ctx.createLinearGradient(0, r.Y - 1, 0, r.Y + r.H + 1);
+        g.addColorStop(0, hex(o.Couleur));
+        g.addColorStop(1, hex(o.Couleur2));
+        ctx.fillStyle = g;
+        ctx.fillRect(r.X, r.Y, r.W, r.H);
+        break;
+      }
+      case 2: // disque
+        ctx.beginPath();
+        ctx.ellipse(r.X + r.W / 2, r.Y + r.H / 2, r.W / 2, r.H / 2, 0, 0, Math.PI * 2);
+        ctx.fillStyle = hex(o.Couleur);
+        ctx.fill();
+        break;
+      case 3: texte(o); break;
+      case 4: icone(o, r); break;
+      case 5: // logo
+        if (etat.logo && etat.logoPret)
+          ctx.drawImage(etat.logo, r.X, r.Y, r.W, r.H);
+        break;
+    }
+  }
+}
+
+function zoneA(x, y) {
+  for (const z of etat.zones) {
+    if (!z.Info && x >= z.R.X && y >= z.R.Y && x < z.R.X + z.R.W && y < z.R.Y + z.R.H)
+      return z.ID;
+  }
+  return -1;
+}
+
+function zone(id) {
+  return etat.zones.find(z => z.ID === id);
+}
+
+function focusables() {
+  return etat.zones.filter(z => !z.Info && !z.Inactif).map(z => z.ID);
+}
+
+function envoyerInteraction() {
+  poster({ t: "ui", hover: etat.hover, press: etat.press, focus: etat.focus,
+           focusVisible: etat.focusVisible });
+}
+
+function majBulle() {
+  const z = etat.hover >= 0 ? zone(etat.hover) : null;
+  if (!z || !z.Bulle) { bulle.style.display = "none"; return; }
+  bulle.textContent = z.Bulle;
+  bulle.classList.toggle("sombre", etat.dark);
+  bulle.style.display = "block";
+  const marge = 10;
+  let x = etat.sourisX + 14, y = etat.sourisY + 16;
+  const b = bulle.getBoundingClientRect();
+  if (x + b.width + marge > etat.w) x = Math.max(marge, etat.sourisX - b.width - 14);
+  if (y + b.height + marge > etat.h) y = Math.max(marge, etat.sourisY - b.height - 12);
+  bulle.style.left = x + "px";
+  bulle.style.top = y + "px";
+}
+
+canvas.addEventListener("mousemove", e => {
+  etat.sourisX = e.clientX; etat.sourisY = e.clientY;
+  const z = zoneA(e.clientX, e.clientY);
+  canvas.style.cursor = z >= 0 && zone(z) && !zone(z).Inactif ? "pointer" : "default";
+  if (z !== etat.hover) {
+    etat.hover = z;
+    envoyerInteraction();
+  }
+  majBulle();
+});
+
+canvas.addEventListener("mouseleave", () => {
+  etat.hover = -1;
+  bulle.style.display = "none";
+  envoyerInteraction();
+});
+
+canvas.addEventListener("mousedown", e => {
+  if (e.button !== 0) return;
+  canvas.focus();
+  const z = zoneA(e.clientX, e.clientY);
+  etat.press = z;
+  etat.focus = z >= 0 ? z : etat.focus;
+  etat.focusVisible = false;
+  envoyerInteraction();
+  e.preventDefault();
+});
+
+canvas.addEventListener("mouseup", e => {
+  if (e.button !== 0) return;
+  const z = zoneA(e.clientX, e.clientY);
+  const appui = etat.press;
+  etat.press = -1;
+  envoyerInteraction();
+  if (appui >= 0 && appui === z) poster({ t: "activate", id: z });
+  e.preventDefault();
+});
+
+function touche(e) {
+  const ids = focusables();
+  if (ids.length === 0) return;
+  let i = ids.indexOf(etat.focus);
+  const suivant = pas => {
+    if (i < 0) i = pas > 0 ? -1 : 0;
+    etat.focus = ids[(i + pas + ids.length) % ids.length];
+    etat.focusVisible = true;
+    envoyerInteraction();
+  };
+  switch (e.key) {
+    case "Tab": suivant(e.shiftKey ? -1 : 1); e.preventDefault(); break;
+    case "ArrowRight": case "ArrowDown": suivant(1); e.preventDefault(); break;
+    case "ArrowLeft": case "ArrowUp": suivant(-1); e.preventDefault(); break;
+    case "Enter": case " ":
+      if (etat.focus >= 0) poster({ t: "activate", id: etat.focus });
+      e.preventDefault(); break;
+    case "Escape":
+      poster({ t: "escape" });
+      e.preventDefault(); break;
+  }
+}
+
+document.addEventListener("keydown", touche);
+
+canvas.addEventListener("blur", () => {
+  if (etat.focusVisible) { etat.focusVisible = false; envoyerInteraction(); }
+});
+
+window.fpc = {
+  logo(data) {
+    const img = new Image();
+    img.onload = () => { etat.logo = img; etat.logoPret = true; dessiner(); };
+    img.src = data;
+  },
+  render(m) {
+    etat.ops = m.ops || [];
+    etat.zones = m.zones || [];
+    etat.w = m.w || 440;
+    etat.h = m.h || 100;
+    etat.dark = !!m.dark;
+    document.documentElement.style.setProperty("--fond", m.dark ? "#15161c" : "#f3f4f9");
+    document.documentElement.style.setProperty("--texte", m.dark ? "#ecedf4" : "#1a1d2b");
+    if (etat.hover >= 0 && !zone(etat.hover)) etat.hover = -1;
+    dessiner();
+    majBulle();
+  }
+};
+
+canvas.focus();
+poster({ t: "ready" });
+</script>
+</body>
+</html>
