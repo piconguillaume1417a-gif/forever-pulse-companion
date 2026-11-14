@@ -76,7 +76,7 @@ const (
 
 func Defaults() Config {
 	// Lancer au démarrage : coché par défaut, décochable dans la fenêtre.
-	return Config{SiteURL: SiteDefaut, WowDir: `C:\Program Files (x86)\World of Warcraft`, StartWithWindows: true, PollSeconds: PollDefaut, AutoUpdate: true}
+	return Config{SiteURL: SiteDefaut, WowDir: defaultWowDir(), StartWithWindows: true, PollSeconds: PollDefaut, AutoUpdate: defaultAutoUpdate()}
 }
 
 // Noms de fichiers dans le dossier de données.
@@ -231,6 +231,12 @@ func Load(path string) (Config, error) {
 	if err := sc.Err(); err != nil {
 		return c, err
 	}
+	if migre, err := migreCheminWindows(path, &c); err != nil {
+		return c, err
+	} else if migre {
+		f.Close()
+		return c, Save(path, c)
+	}
 	if version < VersionFormat || AncienDomaine(c.SiteURL) {
 		if version < 2 {
 			c.StartWithWindows = true
@@ -268,16 +274,16 @@ site_url = %s
 # Dossier d'installation de World of Warcraft. Les SavedVariables sont cherchées dans
 # <wow_dir>\_*_\WTF\Account\*\SavedVariables\ForeverPulse.lua
 wow_dir = %s
-# Lancer au démarrage de Windows (clé HKCU\...\Run, sans droits administrateur).
+%s
 start_with_windows = %t
 # Intervalle de surveillance du fichier, en secondes (300 par défaut, 3600 au plus).
 # Un changement repéré est confirmé 3 s plus tard, puis traité.
 poll_seconds = %d
 # Langue de l'interface : 'fr', 'en', ou '' pour l'anglais.
 language = %s
-# Mise à jour automatique : vérification quotidienne des versions signées publiées.
+%s
 auto_update = %t
-`, VersionFormat, quote(c.SiteURL), quote(c.WowDir), c.StartWithWindows, c.PollSeconds, quote(c.Language), c.AutoUpdate)
+`, VersionFormat, quote(c.SiteURL), quote(c.WowDir), commentaireDemarrage(), c.StartWithWindows, c.PollSeconds, quote(c.Language), commentaireMaj(), c.AutoUpdate)
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(body), 0o600); err != nil {
 		return err
